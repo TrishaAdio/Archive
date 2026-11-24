@@ -672,3 +672,33 @@
   border-color: var(--line-accent);
   color: var(--peach);
 }
+
+.login__card {
+  position: relative;
+  isolation: isolate;
+  margin-top: 70px;
+}
+
+.login__cast {
+  position: absolute;
+  right: 18px;
+  bottom: calc(100% - 2px);
+  z-index: -1;
+  height: 120px;
+  width: auto;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+  animation: loginPeek 0.9s 0.35s var(--ease-spring) both;
+}
+
+@keyframes loginPeek {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

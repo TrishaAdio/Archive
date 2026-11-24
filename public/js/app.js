@@ -18,6 +18,7 @@ import {
   enhanceButtons,
   greeting,
   haptic,
+  prefersReducedMotion,
   syncSegmented,
   toast,
   trackScroll,
@@ -227,7 +228,39 @@ function renderPlanRing() {
   document.getElementById("plan-unit").textContent = remaining === 1 ? "day left" : "days left";
 }
 
+function castMarkup(name) {
+  return `<img class="empty__cast" src="/img/characters/${name}.webp" alt="" aria-hidden="true" decoding="async" />`;
+}
+
+function revealHeroCast() {
+  const cast = document.getElementById("hero-cast");
+  if (!cast || cast.classList.contains("is-in")) return;
+  const show = () => requestAnimationFrame(() => cast.classList.add("is-in"));
+  if (cast.complete && cast.naturalWidth > 0) show();
+  else cast.addEventListener("load", show, { once: true });
+}
+
+function trackHeroParallax() {
+  const cast = document.getElementById("hero-cast");
+  if (!cast || prefersReducedMotion()) return;
+  let queued = false;
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const shift = Math.min(160, window.scrollY * 0.28);
+        cast.style.setProperty("--cast-shift", `${shift.toFixed(1)}px`);
+      });
+    },
+    { passive: true },
+  );
+}
+
 function renderHero(category, archives, viewer) {
+  revealHeroCast();
   const videoTotal = archives.reduce((sum, archive) => sum + archive.videoCount, 0);
   const remaining = Math.max(0, daysLeft(viewer.planExpiresAt) ?? 0);
 
@@ -370,8 +403,8 @@ async function loadVideoPage({ replace = false } = {}) {
 
     if (state.videos.length === 0) {
       grid.innerHTML = state.query
-        ? `<div class="empty">${icon("search")}No video matches “${escapeHtml(state.query)}”.</div>`
-        : `<div class="empty">${icon("film")}This archive has no videos yet.</div>`;
+        ? `<div class="empty empty--cast">${castMarkup("rize-glasses")}No video matches “${escapeHtml(state.query)}”.</div>`
+        : `<div class="empty empty--cast">${castMarkup("reze-smile")}This archive has no videos yet.</div>`;
     } else {
       grid.insertAdjacentHTML("beforeend", page.videos.map((video) => videoCardMarkup(video)).join(""));
       hydrateCards(grid, (id) => openPlayer(id));
@@ -661,6 +694,7 @@ document.getElementById("logout-button").addEventListener("click", async () => {
 window.addEventListener("popstate", () => route());
 
 trackScroll();
+trackHeroParallax();
 enhanceButtons();
 watchSegmented(sortControl);
 startPresence({

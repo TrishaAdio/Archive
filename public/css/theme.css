@@ -1,13 +1,5 @@
 @font-face {
   font-family: "Bodoni Moda";
-  src: url("/fonts/bodoni-moda-latin.woff2") format("woff2-variations");
-  font-weight: 400 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Bodoni Moda";
   src: url("/fonts/bodoni-moda-italic-latin.woff2") format("woff2-variations");
   font-weight: 400 900;
   font-style: italic;
@@ -15,9 +7,9 @@
 }
 
 @font-face {
-  font-family: "Schibsted Grotesk";
-  src: url("/fonts/schibsted-grotesk-latin.woff2") format("woff2-variations");
-  font-weight: 400 900;
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans-latin.woff2") format("woff2-variations");
+  font-weight: 200 800;
   font-style: normal;
   font-display: swap;
 }
@@ -68,8 +60,10 @@
   --accent-soft: rgba(255, 95, 143, 0.14);
   --accent-ink: #26090f;
 
-  --font-display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
-  --font-ui: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-accent: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --font-display: var(--font-sans);
+  --font-ui: var(--font-sans);
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   --r-xs: 8px;
@@ -180,10 +174,9 @@ h3,
 h4 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-optical-sizing: auto;
-  letter-spacing: -0.02em;
-  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
   text-wrap: balance;
 }
 
@@ -193,7 +186,18 @@ p {
 
 em,
 .italic {
+  font-family: var(--font-accent);
   font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+h1 em,
+h2 em,
+h3 em,
+h4 em {
+  font-size: 1.08em;
+  padding-right: 0.04em;
 }
 
 button,
@@ -282,14 +286,16 @@ img {
 
 .wordmark {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-weight: 800;
+  letter-spacing: -0.05em;
   white-space: nowrap;
   color: var(--text);
 }
 
 .wordmark em {
   font-weight: 500;
+  font-size: 1.12em;
+  letter-spacing: -0.03em;
   background: var(--accent);
   -webkit-background-clip: text;
   background-clip: text;

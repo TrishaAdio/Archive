@@ -7,12 +7,14 @@
     <meta name="theme-color" content="#09070c" />
     <meta name="view-transition" content="same-origin" />
     <title>Get Pleasure</title>
-    <link rel="preload" href="/fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/plus-jakarta-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <script src="/js/boot.js"></script>
     <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/splash.css" />
     <link rel="stylesheet" href="/css/app.css" />
   </head>
   <body class="app-body">
+    <div class="arrival" aria-hidden="true"></div>
     <header class="topbar">
       <button class="icon-btn topbar__back" id="nav-back" type="button" aria-label="Go back" hidden>
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -35,6 +37,7 @@
     <main class="main" id="main">
       <section class="view" id="view-home" data-view="home">
         <div class="hero">
+          <img class="hero__cast" id="hero-cast" src="/img/characters/rize-lean.webp" alt="" width="614" height="675" decoding="async" aria-hidden="true" />
           <p class="eyebrow" id="hero-eyebrow">Your tier</p>
           <p class="hero__greeting" id="hero-greeting"></p>
           <h1 class="hero__title" id="hero-title">Loading</h1>
@@ -55,11 +58,8 @@
             <span class="section-head__count" id="archive-count"></span>
           </div>
           <div class="archive-grid" id="archive-grid"></div>
-          <div class="empty" id="archive-empty" hidden>
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="m12 3 9 5-9 5-9-5z" />
-              <path d="m3 13 9 5 9-5" />
-            </svg>
+          <div class="empty empty--cast" id="archive-empty" hidden>
+            <img class="empty__cast" src="/img/characters/rize-glasses.webp" alt="" width="388" height="560" loading="lazy" aria-hidden="true" />
             Nothing has been published for your tier yet. Check back soon.
           </div>
         </div>
@@ -206,6 +206,7 @@
 
     <div class="scrim" id="account-sheet" role="dialog" aria-modal="true" aria-labelledby="account-title" hidden>
       <div class="sheet-panel account">
+        <img class="sheet-cast" src="/img/characters/banner-girl.webp" alt="" width="313" height="411" loading="lazy" aria-hidden="true" />
         <p class="eyebrow">Your access</p>
         <h2 class="sheet-title" id="account-title">Membership</h2>
 
@@ -248,6 +249,7 @@
 
     <div class="scrim" id="broadcast-modal" role="alertdialog" aria-modal="true" aria-labelledby="broadcast-title" hidden>
       <div class="sheet-panel broadcast">
+        <img class="sheet-cast sheet-cast--broadcast" src="/img/characters/reze-cafe.webp" alt="" width="617" height="710" loading="lazy" aria-hidden="true" />
         <span class="broadcast__icon" aria-hidden="true">
           <svg class="icon" viewBox="0 0 24 24" focusable="false">
             <path d="M4 10v4a1.5 1.5 0 0 0 1.5 1.5H7l9 4.5V4L7 8.5H5.5A1.5 1.5 0 0 0 4 10z" />

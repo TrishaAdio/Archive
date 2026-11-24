@@ -1,0 +1,273 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: calc(24px + var(--safe-t)) 24px calc(32px + var(--safe-b));
+  background:
+    radial-gradient(70vmax 50vmax at 50% 38%, rgba(227, 38, 190, 0.28), transparent 62%),
+    radial-gradient(50vmax 40vmax at 50% 110%, rgba(154, 218, 234, 0.12), transparent 70%),
+    var(--bg);
+}
+
+html[data-splash="on"] .splash {
+  display: flex;
+}
+
+html[data-splash="on"] body {
+  overflow: hidden;
+}
+
+.splash__frame {
+  position: relative;
+  width: min(86vw, 420px);
+  aspect-ratio: 735 / 417;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(255, 140, 210, 0.35);
+  box-shadow: 0 24px 60px -24px rgba(227, 38, 190, 0.7);
+  animation: splashIn 0.9s var(--ease-spring) both;
+  transform-origin: 50% 60%;
+}
+
+.splash::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(130vw, 640px);
+  aspect-ratio: 1.6;
+  transform: translate(-50%, -62%);
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side at 30% 50%, rgba(255, 60, 190, 0.38), transparent),
+    radial-gradient(closest-side at 72% 55%, rgba(120, 210, 240, 0.2), transparent);
+  pointer-events: none;
+}
+
+.splash > * {
+  position: relative;
+}
+
+.splash__banner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: splashDrift 7s var(--ease-in-out) infinite alternate;
+}
+
+.splash__scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+
+.splash__scan::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22%;
+  top: -25%;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  animation: scanline 2.6s linear infinite;
+}
+
+.splash__glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.18) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: glare 3.2s 0.6s var(--ease-in-out) infinite;
+}
+
+.splash__title {
+  max-width: 16ch;
+  margin: 4px 0 0;
+  line-height: 1.08;
+  text-wrap: balance;
+  font-size: clamp(22px, 6.4vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-align: center;
+  animation: rise 0.8s 0.15s var(--ease-out) both;
+}
+
+.splash__title em {
+  background: linear-gradient(100deg, #ff7ad1, var(--peach) 55%, #9adaea);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.06em;
+}
+
+.splash__title::after {
+  content: "";
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: dots 1.4s steps(4, end) infinite;
+}
+
+.splash__bar {
+  position: relative;
+  width: min(70vw, 300px);
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: rgba(255, 236, 222, 0.1);
+  animation: rise 0.8s 0.25s var(--ease-out) both;
+}
+
+.splash__fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff5fbf, var(--peach), #9adaea);
+  box-shadow: 0 0 18px rgba(255, 95, 191, 0.8);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left center;
+  transition: transform 0.45s var(--ease-out);
+}
+
+.splash__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(70vw, 300px);
+  margin: -10px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  animation: rise 0.8s 0.3s var(--ease-out) both;
+}
+
+.splash.is-leaving {
+  animation: splashOut 0.75s var(--ease-in-out) forwards;
+}
+
+.splash.is-leaving .splash__frame {
+  animation: frameOut 0.75s var(--ease-in-out) forwards;
+}
+
+@keyframes splashIn {
+  from {
+    opacity: 0;
+    transform: scale(0.86) translateY(18px) rotate(-1.5deg);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes splashDrift {
+  to {
+    transform: scale(1.06) translateX(-2%);
+  }
+}
+
+@keyframes scanline {
+  to {
+    top: 110%;
+  }
+}
+
+@keyframes glare {
+  60%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes dots {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75%,
+  100% {
+    content: "...";
+  }
+}
+
+@keyframes splashOut {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes frameOut {
+  to {
+    transform: scale(1.18);
+    filter: blur(14px) brightness(1.4);
+  }
+}
+
+.iris {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  pointer-events: none;
+  visibility: hidden;
+  background:
+    radial-gradient(circle at var(--iris-x, 50%) var(--iris-y, 20%), #fff1e8 0%, #ffae8a 10%, #ff5fbf 26%, #8a1f73 48%, #2a0d2a 70%, var(--bg) 92%);
+  clip-path: circle(0 at var(--iris-x, 50%) var(--iris-y, 20%));
+}
+
+.iris.is-open {
+  visibility: visible;
+  animation: irisOpen 0.85s var(--ease-in-out) forwards;
+}
+
+@keyframes irisOpen {
+  to {
+    clip-path: circle(150vmax at var(--iris-x, 50%) var(--iris-y, 20%));
+  }
+}
+
+.arrival {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: none;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 22%, rgba(255, 95, 143, 0.55), #1a0b1c 40%, var(--bg) 75%);
+}
+
+html[data-arrival="on"] .arrival {
+  display: block;
+  animation: arrive 0.9s 0.05s var(--ease-out) forwards;
+}
+
+@keyframes arrive {
+  to {
+    opacity: 0;
+    transform: scale(1.08);
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash__banner,
+  .splash__scan::after,
+  .splash__glare {
+    animation: none;
+  }
+}
