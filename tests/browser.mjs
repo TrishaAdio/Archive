@@ -162,10 +162,23 @@ async function main() {
     check("trust list has four points", (await page.locator(".gate__trust-item").count()) === 4);
 
     const fontFamily = await page.locator(".gate__title").evaluate((node) => getComputedStyle(node).fontFamily);
-    check("custom display font applied", fontFamily.includes("Bricolage"), `got ${fontFamily}`);
+    check("editorial display font applied", fontFamily.includes("Bodoni Moda"), `got ${fontFamily}`);
 
-    const fontLoaded = await page.evaluate(() => document.fonts.check('700 40px "Bricolage Grotesque"'));
-    check("display font actually loaded by the browser", fontLoaded);
+    await page.evaluate(() => document.fonts.ready);
+    const fonts = await page.evaluate(() => ({
+      display: document.fonts.check('600 40px "Bodoni Moda"'),
+      italic: document.fonts.check('italic 500 40px "Bodoni Moda"'),
+      ui: document.fonts.check('500 16px "Schibsted Grotesk"'),
+      mono: document.fonts.check('500 12px "Martian Mono"'),
+    }));
+    check("display serif loaded", fonts.display);
+    check("italic display serif loaded", fonts.italic);
+    check("ui grotesk loaded", fonts.ui);
+    check("mono font loaded", fonts.mono);
+
+    const bodyFont = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
+    check("body text uses Schibsted Grotesk", bodyFont.includes("Schibsted Grotesk"), `got ${bodyFont}`);
+    check("paste button offered on the key field", await page.locator("#gate-paste").isVisible());
 
     await page.fill("#key-input", "GP-definitely-wrong-key");
     await page.click("#gate-submit");
@@ -186,12 +199,32 @@ async function main() {
     check('"Start Watching" button present', await page.locator(".acard__cta").first().isVisible());
     check("plan days pill visible", await page.locator("#plan-pill").isVisible());
     check("plan pill mentions days left", (await page.locator("#plan-pill").textContent()).includes("day"));
+    check("greeting line rendered", /welcome back/i.test(await page.locator("#hero-greeting").textContent()));
+    check("hero stat chips rendered", (await page.locator("#hero-chips .chip").count()) === 3);
+
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".acard__cover img")].some((img) => img.complete && img.naturalWidth > 0),
+      { timeout: 10000 },
+    );
+    const coverCount = await page.locator(".acard__cover img").count();
+    check("archive card shows a thumbnail mosaic", coverCount === 3, `got ${coverCount}`);
 
     await page.click("#menu-toggle");
     await page.waitForSelector("#account-sheet:not([hidden])");
     check("account sheet shows the locked IP", (await page.locator("#account-ip").textContent()).length > 3);
     check("account sheet shows a masked key hint", (await page.locator("#account-key").textContent()).includes("GP-"));
+
+    await page.waitForTimeout(1500);
+    const ring = await page.evaluate(() => ({
+      offset: Number(getComputedStyle(document.getElementById("plan-progress")).strokeDashoffset.replace("px", "")),
+      days: document.getElementById("plan-days").textContent.trim(),
+    }));
+    check("plan ring is drawn nearly full for a fresh 30-day key", ring.offset >= 0 && ring.offset < 20, `offset ${ring.offset}`);
+    check("plan ring counts 30 days", ring.days === "30", `got ${ring.days}`);
+
     await page.click("#sheet-close");
+    await page.waitForSelector("#account-sheet", { state: "hidden", timeout: 3000 });
+    check("account sheet closes with its exit animation", await page.locator("#account-sheet").isHidden());
 
     section("Archive listing");
     await page.click(".acard__cta");
@@ -201,21 +234,71 @@ async function main() {
     check("all 9 videos listed", cardCount === 9, `got ${cardCount}`);
     check("archive title shown", (await page.locator("#archive-title").textContent()).trim() === "Season One");
 
-    const numbers = await page.locator(".thumb__number").allTextContents();
+    const numbers = await page.locator("#video-grid .thumb__number").allTextContents();
     check("video numbers use the #N format", numbers.every((value) => /^#\d+$/.test(value)), `got ${numbers.slice(0, 4)}`);
     check("numbers cover #1 through #9", new Set(numbers).size === 9 && numbers.includes("#1"), `got ${numbers.join(",")}`);
 
-    const thumbLoaded = await page.locator(".thumb__img").first().evaluate((img) => img.complete && img.naturalWidth > 0);
-    check("thumbnail image actually loaded", thumbLoaded);
+    await page.waitForFunction(
+      () => {
+        const img = document.querySelector("#video-grid .thumb__img");
+        return img && img.complete && img.naturalWidth > 0 && img.classList.contains("is-loaded");
+      },
+      { timeout: 10000 },
+    );
+    check("thumbnail image loaded and faded in", true);
 
-    const transcodeBadges = await page.locator(".thumb__duration--warn").count();
+    const transcodeBadges = await page.locator("#video-grid .thumb__duration--warn").count();
     check("mkv file flagged as needing transcode", transcodeBadges === 1, `got ${transcodeBadges}`);
+
+    const indicatorBefore = await page.evaluate(() => {
+      const node = document.querySelector("#sort-control .segmented__indicator");
+      return { width: node.getBoundingClientRect().width, left: node.getBoundingClientRect().left };
+    });
+    check("sort indicator sits under the active tab", indicatorBefore.width > 40, `width ${indicatorBefore.width}`);
 
     await page.click('.sort[data-sort="number"]');
     await page.waitForTimeout(900);
-    const sortedNumbers = await page.locator(".thumb__number").allTextContents();
+    const sortedNumbers = await page.locator("#video-grid .thumb__number").allTextContents();
     check("sorting by number starts at #1", sortedNumbers[0] === "#1", `got ${sortedNumbers[0]}`);
     check("sort tab marked active", await page.locator('.sort[data-sort="number"]').evaluate((n) => n.classList.contains("is-active")));
+
+    const indicatorAfter = await page.evaluate(() => {
+      const node = document.querySelector("#sort-control .segmented__indicator");
+      const active = document.querySelector('.sort[data-sort="number"]');
+      return {
+        left: node.getBoundingClientRect().left,
+        activeLeft: active.getBoundingClientRect().left,
+        width: node.getBoundingClientRect().width,
+        activeWidth: active.getBoundingClientRect().width,
+      };
+    });
+    check("sort indicator slid to the new tab", Math.abs(indicatorAfter.left - indicatorAfter.activeLeft) < 2, JSON.stringify(indicatorAfter));
+    check("sort indicator matches the tab width", Math.abs(indicatorAfter.width - indicatorAfter.activeWidth) < 2, JSON.stringify(indicatorAfter));
+
+    section("Search and jump to number");
+    await page.fill("#video-search", "#3");
+    await page.waitForFunction(() => document.querySelectorAll("#video-grid .vcard").length === 1, { timeout: 6000 });
+    check("typing #3 jumps straight to video #3", (await page.locator("#video-grid .thumb__number").first().textContent()) === "#3");
+    check("result count shown in the subtitle", (await page.locator("#archive-sub").textContent()).includes("1 result"));
+
+    await page.fill("#video-search", "paper");
+    await page.waitForFunction(
+      () => {
+        const titles = [...document.querySelectorAll("#video-grid .vcard__title")].map((node) => node.textContent);
+        return titles.length === 1 && titles[0] === "Paper Moon";
+      },
+      { timeout: 6000 },
+    );
+    check("title search finds Paper Moon", true);
+
+    await page.fill("#video-search", "#999");
+    await page.waitForSelector("#video-grid .empty", { timeout: 6000 });
+    check("a missing number shows a friendly empty state", (await page.locator("#video-grid .empty").textContent()).includes("#999"));
+
+    await page.click("#video-search-clear");
+    await page.waitForFunction(() => document.querySelectorAll("#video-grid .vcard").length === 9, { timeout: 6000 });
+    check("clearing the search restores every video", true);
+    check("clear button hides itself again", await page.locator("#video-search-clear").isHidden());
 
     section("Protected player with real video playback");
     await page.click("#video-grid .vcard >> nth=0");
@@ -266,6 +349,17 @@ async function main() {
       error: video.error?.code ?? null,
     }));
     check("seeking works over range requests", afterSeek.time > 2.5 && afterSeek.error === null, JSON.stringify(afterSeek));
+
+    section("Up next countdown");
+    await page.waitForSelector("#upnext-overlay:not([hidden])", { timeout: 10000 });
+    check("up-next card appears when the video ends", await page.locator("#upnext-overlay").isVisible());
+    check("up-next offers the next number in order", (await page.locator("#upnext-title").textContent()).startsWith("#2"), await page.locator("#upnext-title").textContent());
+    const countdown = Number(await page.locator("#upnext-seconds").textContent());
+    check("countdown is ticking", countdown >= 1 && countdown <= 6, `got ${countdown}`);
+    await page.click("#upnext-cancel");
+    check('"Stay here" cancels autoplay', await page.locator("#upnext-overlay").isHidden());
+    await page.waitForTimeout(6500);
+    check("player stays on the same video after cancelling", (await page.locator("#player-number").textContent()) === "#1");
 
     section("Likes and resume");
     const likeBefore = await page.locator("#like-count").textContent();
@@ -369,6 +463,25 @@ async function main() {
     check("admin UI generates a key", newKey.startsWith("GP-"), `got ${newKey.slice(0, 12)}`);
     check("key list shows subscriptions", (await adminPage.locator("#key-list .row").count()) >= 2);
 
+    await adminPage.click('#key-list .row:has-text("Browser created") [data-expire]');
+    await adminPage.waitForSelector(".scrim .sheet-panel", { timeout: 5000 });
+    check("expiring a key asks for confirmation in a styled sheet", (await adminPage.locator(".scrim .sheet-title").textContent()).includes("Expire"));
+
+    await adminPage.click('.scrim [data-answer="no"]');
+    await adminPage.waitForSelector(".scrim", { state: "detached", timeout: 3000 });
+    check("cancelling the sheet leaves the key active", (await adminPage.locator('#key-list .row:has-text("Browser created") .pill').textContent()) === "active");
+
+    await adminPage.click('#key-list .row:has-text("Browser created") [data-expire]');
+    await adminPage.click('.scrim [data-answer="yes"]');
+    await adminPage.waitForSelector('.toast:has-text("Subscription expired")', { timeout: 6000 });
+    check("no error toast was raised", (await adminPage.locator(".toast--error").count()) === 0);
+    check("confirming shows a success toast", true);
+    await adminPage.waitForFunction(
+      () => [...document.querySelectorAll("#key-list .row")].some((row) => row.textContent.includes("Browser created") && row.textContent.includes("revoked")),
+      { timeout: 6000 },
+    );
+    check("the key list updates to revoked", true);
+
     await adminPage.click('.tab[data-tab="activity"]');
     await adminPage.waitForSelector("#live-list .row", { timeout: 10000 });
     check("activity tab lists the live viewer", (await adminPage.locator("#live-list .row").count()) >= 1);
@@ -382,6 +495,9 @@ async function main() {
     await page.bringToFront();
     await page.waitForURL((url) => !url.pathname.startsWith("/watch"), { timeout: 40000 });
     check("expired viewer is thrown back to the gate", !page.url().includes("/watch"), `at ${page.url()}`);
+    await page.waitForSelector("#gate-reason:not([hidden])", { timeout: 6000 });
+    check("the gate explains why the viewer was signed out", (await page.locator("#gate-reason").textContent()).includes("session has ended"));
+    check("the reason is removed from the address bar", !page.url().includes("reason="), page.url());
 
     section("Console hygiene");
     const cspViolations = [...consoleErrors, ...adminErrors].filter((text) => /content security policy|refused to/i.test(text));

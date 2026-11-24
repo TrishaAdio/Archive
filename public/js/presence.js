@@ -1,4 +1,5 @@
 import { api, ApiError, escapeHtml } from "./api.js";
+import { closeScrim, haptic } from "./ui.js";
 
 const HEARTBEAT_MS = 20000;
 
@@ -11,8 +12,8 @@ function startPresence({ onExpired }) {
   let timer = null;
 
   function hide() {
-    modal.hidden = true;
     showing = null;
+    return closeScrim(modal);
   }
 
   function show(broadcast) {
@@ -21,19 +22,14 @@ function startPresence({ onExpired }) {
     titleNode.textContent = broadcast.title;
     messageNode.innerHTML = escapeHtml(broadcast.message).replace(/\n/g, "<br />");
     modal.hidden = false;
+    haptic([20, 80, 20]);
     ackButton.focus();
   }
 
   ackButton.addEventListener("click", async () => {
     const id = showing;
     hide();
-    if (id) {
-      try {
-        await api.post(`/api/broadcasts/${id}/ack`);
-      } catch {
-        /* acknowledgement is retried on the next heartbeat */
-      }
-    }
+    if (id) await api.post(`/api/broadcasts/${id}/ack`).catch(() => null);
   });
 
   async function beat() {

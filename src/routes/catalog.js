@@ -34,12 +34,15 @@ function createCatalogRouter({ catalog, engagement }) {
         })
         .filter(Boolean);
 
+      const covers = await catalog.coversForArchives(archives.map((archive) => catalog.toArchiveObjectId(archive.id)));
+
       res.set("Cache-Control", "no-store").json({
         category: category ? { code: category.code, name: category.name } : { code: categoryCode, name: null },
-        archives,
+        archives: archives.map((archive) => ({ ...archive, coverVideoIds: covers.get(archive.id) ?? [] })),
         continueWatching,
         viewer: {
           keyHint: req.viewer.keyHint,
+          planStartsAt: req.viewer.planStartsAt.toISOString(),
           planExpiresAt: req.viewer.planExpiresAt.toISOString(),
           lockedIp: req.viewer.ipFingerprint,
         },
@@ -58,7 +61,8 @@ function createCatalogRouter({ catalog, engagement }) {
       const archive = await catalog.getArchive(req.params.archiveId);
       await assertVisible(archive, req.viewer);
 
-      const { docs, total } = await catalog.listVideos(archive._id, { sort, skip, limit });
+      const query = typeof req.query.q === "string" ? req.query.q : "";
+      const { docs, total } = await catalog.listVideos(archive._id, { sort, skip, limit, query });
       const videoIds = docs.map((doc) => doc._id);
 
       const [progressMap, likedSet] = await Promise.all([

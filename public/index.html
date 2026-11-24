@@ -4,30 +4,48 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#07070a" />
+    <meta name="theme-color" content="#09070c" />
     <title>Get Pleasure — Members Entry</title>
-    <link rel="preload" href="/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/bodoni-moda-italic-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/css/theme.css" />
     <link rel="stylesheet" href="/css/gate.css" />
   </head>
   <body class="gate-body">
     <main class="gate">
-      <div class="gate__aura" aria-hidden="true"></div>
+      <div class="gate__seal" id="gate-seal" aria-hidden="true">
+        <span class="gate__seal-ring"></span>
+        <span class="gate__seal-core">
+          <svg class="icon gate__lock" viewBox="0 0 24 24" focusable="false">
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+            <path class="gate__shackle" d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" />
+          </svg>
+        </span>
+      </div>
 
       <header class="gate__head">
-        <p class="gate__eyebrow">Members only</p>
-        <h1 class="gate__title wordmark">Get&nbsp;Pleasure</h1>
+        <p class="eyebrow gate__eyebrow">Members only · Private archive</p>
+        <h1 class="gate__title wordmark">Get <em>Pleasure</em></h1>
         <p class="gate__sub">
-          A private archive. Entry is by access key, and each key is tied to the network it is first
-          opened on.
+          Enter the access key you were given. It opens your collection and locks itself to this
+          network.
         </p>
       </header>
 
+      <div class="notice notice--error gate__reason" id="gate-reason" role="alert" hidden></div>
+
       <form class="gate__form" id="gate-form" autocomplete="off" novalidate>
-        <label class="field">
-          <span class="field__label">Access key</span>
+        <label class="gate__label" for="key-input">Access key</label>
+        <div class="gate__field">
+          <span class="gate__field-icon" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24" focusable="false">
+              <circle cx="8" cy="15" r="4" />
+              <path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" />
+            </svg>
+          </span>
           <input
-            class="input gate__input mono"
+            class="gate__input"
             id="key-input"
             name="key"
             type="text"
@@ -35,55 +53,77 @@
             autocapitalize="none"
             autocorrect="off"
             spellcheck="false"
-            placeholder="GP-xxxxxxxxxxxxxxxxxxxxxxxx"
+            enterkeyhint="go"
+            placeholder="GP-••••••••••••••••"
             aria-describedby="gate-error"
             required
           />
-        </label>
+          <button class="gate__paste" id="gate-paste" type="button">Paste</button>
+        </div>
 
         <p class="notice notice--error" id="gate-error" role="alert" hidden></p>
 
-        <button class="btn btn--primary btn--block" id="gate-submit" type="submit">
+        <button class="btn btn--primary btn--block gate__submit" id="gate-submit" type="submit">
           <span id="gate-submit-label">Unlock access</span>
+          <svg class="icon gate__submit-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
         </button>
 
         <p class="gate__hint">
-          Lost your key or changed network? Contact the owner to have it re-issued.
+          Changed network or lost your key? The owner can unlock it for you.
         </p>
       </form>
 
       <section class="gate__trust" aria-label="How your access is protected">
-        <h2 class="gate__trust-title">How this archive is kept private</h2>
+        <h2 class="gate__trust-title">Private by design</h2>
         <ul class="gate__trust-list">
-          <li class="gate__trust-item">
-            <span class="gate__trust-icon" aria-hidden="true">01</span>
+          <li class="gate__trust-item reveal">
+            <span class="gate__trust-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                <path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0" />
+                <circle cx="12" cy="19.3" r=".9" />
+              </svg>
+            </span>
             <div>
-              <strong>Your key is locked to one network.</strong>
-              Once redeemed, the same key used from a different IP address is refused, even though
-              the key itself is correct.
+              <strong>Locked to one network</strong>
+              <span>The same key from a different IP address is refused, even when it is correct.</span>
             </div>
           </li>
-          <li class="gate__trust-item">
-            <span class="gate__trust-icon" aria-hidden="true">02</span>
+          <li class="gate__trust-item reveal">
+            <span class="gate__trust-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c5.5 0 9 5.5 9 7a10 10 0 0 1-2.6 3.6M6.4 6.5C4.3 7.9 3 10.4 3 12c0 1.5 3.5 7 9 7 1.6 0 3-.4 4.2-1.1" />
+                <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+              </svg>
+            </span>
             <div>
-              <strong>We never store your key.</strong>
-              Only a SHA-256 hash is saved, so a database leak cannot reveal a working key.
+              <strong>Your key is never stored</strong>
+              <span>Only a SHA-256 hash is kept, so a database leak cannot reveal a working key.</span>
             </div>
           </li>
-          <li class="gate__trust-item">
-            <span class="gate__trust-icon" aria-hidden="true">03</span>
+          <li class="gate__trust-item reveal">
+            <span class="gate__trust-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                <circle cx="12" cy="13.5" r="7.5" />
+                <path d="M12 9.5v4l2.5 1.5M9.5 2.5h5" />
+              </svg>
+            </span>
             <div>
-              <strong>Video links die in about two minutes.</strong>
-              Every playback link is signed for your session and your IP, so a copied link stops
-              working almost immediately.
+              <strong>Links expire in minutes</strong>
+              <span>Every playback link is signed to your session and IP, and stops working within about two minutes.</span>
             </div>
           </li>
-          <li class="gate__trust-item">
-            <span class="gate__trust-icon" aria-hidden="true">04</span>
+          <li class="gate__trust-item reveal">
+            <span class="gate__trust-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+            </span>
             <div>
-              <strong>No third-party tracking.</strong>
-              Nothing on this page loads from another company's servers, so no outside party sees
-              what you watch.
+              <strong>No third-party tracking</strong>
+              <span>Nothing here loads from another company's servers, so no one else sees what you watch.</span>
             </div>
           </li>
         </ul>

@@ -27,8 +27,8 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 ## Tests
 
 ```bash
-npm run test:e2e        # 166 API and security checks against a temporary MongoDB
-npm run test:browser    # 66 checks driving real Chromium, including video playback
+npm run test:e2e        # 188 API and security checks against a temporary MongoDB
+npm run test:browser    # 98 checks driving real Chromium, including video playback
 npm run screenshots     # writes screenshots/ for a visual pass
 ```
 
@@ -233,13 +233,38 @@ tests/
 
 ## Design
 
-Type is Bricolage Grotesque for display and Instrument Sans for UI, both self-hosted as variable
-WOFF2 so no third party sees your traffic and nothing shifts while loading.
+The direction is editorial and nocturnal, closer to a fashion magazine than a dashboard.
 
-The layout is mobile-first: a 414px-wide phone is the design target, with grids widening at
-larger breakpoints. Tap targets are at least 38px, scrollers are snap-aligned, and safe-area
-insets are respected on notched phones.
+| Role | Typeface | Why |
+| --- | --- | --- |
+| Display | Bodoni Moda, roman and italic | High-contrast didone for headlines; the italic carries the accent words |
+| Interface | Schibsted Grotesk | A newspaper grotesk; clearer at small sizes than the usual UI defaults |
+| Codes and numbers | Martian Mono | Keys, `#numbers`, timers and labels, so identifiers always read as data |
 
-Motion is CSS-only: staggered card reveals on scroll, spring easing on press, a shake on a
-rejected key, a pop on the like button, and shimmer skeletons during loads. Everything inside a
-`prefers-reduced-motion` guard collapses to near-zero duration.
+All three are variable WOFF2 under the SIL Open Font License, self-hosted so no third party sees
+your traffic. Colour runs from rose through peach to champagne over a violet-black background with
+a slow aurora and a faint film grain.
+
+### Interaction
+
+- **Gate:** a pulsing seal whose lock opens on success, a gradient ring around the focused key
+  field, a Paste button for mobile, and a shake with haptic buzz on a wrong key. When a viewer is
+  signed out, the gate explains why.
+- **Home:** a time-of-day greeting, stat chips, and archive cards built from a mosaic of the three
+  most-watched thumbnails. On desktop the cards tilt and light up under the pointer.
+- **Archive:** a sticky search that jumps straight to a number (`#42` or `42`) or matches titles,
+  a sort control whose highlight slides between options, and infinite scroll.
+- **Player:** an ambient glow taken from the thumbnail, a "Resuming from 3:12" chip, a burst
+  animation on like, and a Netflix-style up-next card with a 6-second countdown that cancels if
+  the viewer scrubs back.
+- **Account sheet:** a ring showing how much of the plan is left, counting down to the days
+  remaining.
+- **Owner console:** stat values that count up, styled confirmation sheets instead of browser
+  dialogs, toasts for every action, clickable folder breadcrumbs, and one-tap plan presets.
+
+View changes use the View Transitions API where the browser supports it. Primary buttons pull
+toward the pointer and ripple on press. Every animation sits behind a `prefers-reduced-motion`
+guard and collapses to near-zero duration for people who ask for less motion.
+
+The layout is mobile-first, designed at 414px wide, with tap targets of at least 40px and
+safe-area insets respected on notched phones.

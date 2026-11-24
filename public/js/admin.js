@@ -1,7 +1,9 @@
-import { api, ApiError, escapeHtml, formatBytes, formatDate, formatCount, icon } from "./api.js";
+import { api, ApiError, escapeHtml, formatBytes, formatDate, formatCount, icon, plural } from "./api.js";
+import { confirmSheet, countUp, enhanceButtons, syncSegmented, toast, trackScroll, watchSegmented } from "./ui.js";
 
 const loginView = document.getElementById("login-view");
 const consoleView = document.getElementById("console-view");
+const tabs = document.getElementById("tabs");
 
 const state = {
   categories: [],
@@ -9,7 +11,17 @@ const state = {
   cwd: "",
   selection: null,
   refreshTimer: null,
+  statsBuilt: false,
 };
+
+const STAT_DEFS = [
+  { key: "liveViewers", label: "Live viewers now", icon: "eye", accent: true },
+  { key: "activeSubscriptions", label: "Active subscriptions", icon: "users" },
+  { key: "videoCount", label: "Videos in library", icon: "film" },
+  { key: "archiveCount", label: "Archives", icon: "layers" },
+  { key: "categoryCount", label: "Category codes", icon: "grid" },
+  { key: "totalBytes", label: "Library size", icon: "box", bytes: true },
+];
 
 function setError(id, message) {
   const node = document.getElementById(id);
@@ -23,34 +35,54 @@ function describe(error) {
   return error.message;
 }
 
+function stagger(root, selector) {
+  root.querySelectorAll(selector).forEach((node, index) => node.style.setProperty("--i", String(Math.min(index, 14))));
+}
+
+function showLogin() {
+  clearInterval(state.refreshTimer);
+  consoleView.hidden = true;
+  loginView.hidden = false;
+  document.getElementById("admin-token").focus();
+}
+
 document.getElementById("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   setError("login-error", "");
-  const token = document.getElementById("admin-token").value.trim();
+  const tokenInput = document.getElementById("admin-token");
 
   try {
-    await api.post("/api/admin/login", { token });
-    document.getElementById("admin-token").value = "";
+    await api.post("/api/admin/login", { token: tokenInput.value.trim() });
+    tokenInput.value = "";
     await enterConsole();
   } catch (error) {
     setError("login-error", describe(error));
+    const card = document.getElementById("login-form");
+    card.classList.remove("shake");
+    void card.offsetWidth;
+    card.classList.add("shake");
   }
 });
 
 document.getElementById("admin-logout").addEventListener("click", async () => {
-  clearInterval(state.refreshTimer);
-  try {
-    await api.post("/api/admin/logout");
-  } catch {
-    /* leaving regardless */
-  }
-  consoleView.hidden = true;
-  loginView.hidden = false;
+  await api.post("/api/admin/logout").catch(() => null);
+  state.statsBuilt = false;
+  showLogin();
 });
 
 async function enterConsole() {
   loginView.hidden = true;
   consoleView.hidden = false;
+  document.getElementById("dash-date").textContent = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const hour = new Date().getHours();
+  document.getElementById("dash-when").textContent = hour >= 18 || hour < 5 ? "Tonight" : "Today";
+
+  watchSegmented(tabs);
+  enhanceButtons();
 
   await Promise.all([loadDashboard(), loadCategories(), loadArchives()]);
   await Promise.all([browse(""), loadKeys(), loadBroadcasts(), loadActivity()]);
@@ -64,86 +96,93 @@ async function enterConsole() {
   }, 15000);
 }
 
-document.querySelectorAll(".tab").forEach((tab) => {
+tabs.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((node) => node.classList.toggle("is-active", node === tab));
+    tabs.querySelectorAll(".tab").forEach((node) => {
+      const active = node === tab;
+      node.classList.toggle("is-active", active);
+      node.setAttribute("aria-selected", String(active));
+    });
+    syncSegmented(tabs);
     document.querySelectorAll("[data-panel]").forEach((panel) => {
       panel.hidden = panel.dataset.panel !== tab.dataset.tab;
     });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 });
+
+function buildStats() {
+  document.getElementById("stats").innerHTML = STAT_DEFS.map(
+    (stat) => `
+      <div class="stat${stat.accent ? " stat--accent" : ""}">
+        <span class="stat__icon">${icon(stat.icon)}</span>
+        <span class="stat__value" data-stat="${stat.key}">0</span>
+        <span class="stat__label">${stat.label}</span>
+      </div>`,
+  ).join("");
+  state.statsBuilt = true;
+}
 
 async function loadDashboard() {
   try {
     const overview = await api.get("/api/admin/overview");
+    if (!state.statsBuilt) buildStats();
 
     document.getElementById("live-pill").textContent = `${overview.liveViewers} live`;
 
-    document.getElementById("stats").innerHTML = [
-      { label: "Live viewers now", value: overview.liveViewers, accent: true },
-      { label: "Active subscriptions", value: overview.activeSubscriptions },
-      { label: "Videos in library", value: formatCount(overview.videoCount) },
-      { label: "Archives", value: overview.archiveCount },
-      { label: "Category codes", value: overview.categoryCount },
-      { label: "Library size", value: formatBytes(overview.totalBytes) },
-    ]
-      .map(
-        (stat) => `
-        <div class="stat${stat.accent ? " stat--accent" : ""}">
-          <span class="stat__value">${stat.value}</span>
-          <span class="stat__label">${stat.label}</span>
-        </div>`,
-      )
-      .join("");
+    for (const stat of STAT_DEFS) {
+      const node = document.querySelector(`[data-stat="${stat.key}"]`);
+      if (stat.bytes) node.textContent = formatBytes(overview[stat.key]);
+      else countUp(node, overview[stat.key], { format: (value) => formatCount(value) });
+    }
 
     document.getElementById("server-info").innerHTML = [
       ["Media root", `<code class="mono">${escapeHtml(overview.mediaRoot)}</code>`],
-      ["IP lock mode", overview.ipMatchMode === "strict" ? "Strict (exact IP)" : "Relaxed (same subnet)"],
+      ["IP lock mode", overview.ipMatchMode === "strict" ? "Strict, exact IP" : "Relaxed, same subnet"],
       [
         "ffmpeg",
         overview.ffmpegAvailable
           ? '<span class="pill pill--ok">Installed</span>'
-          : '<span class="pill pill--warn">Missing — no auto thumbnails or durations</span>',
+          : '<span class="pill pill--warn">Missing, no auto thumbnails</span>',
       ],
       ["Live window", `${overview.presenceWindowSeconds}s since last heartbeat`],
       [
         "Active broadcast",
         overview.activeBroadcast
-          ? `${escapeHtml(overview.activeBroadcast.title)} (${overview.activeBroadcast.ackCount} read)`
+          ? `${escapeHtml(overview.activeBroadcast.title)} · ${overview.activeBroadcast.ackCount} read`
           : "None",
       ],
     ]
       .map(([key, value]) => `<div class="kv__row"><dt>${key}</dt><dd>${value}</dd></div>`)
       .join("");
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
-      clearInterval(state.refreshTimer);
-      consoleView.hidden = true;
-      loginView.hidden = false;
-    }
+    if (error instanceof ApiError && error.status === 401) showLogin();
   }
 }
 
 async function loadCategories() {
   const { categories } = await api.get("/api/admin/categories");
   state.categories = categories;
+  const list = document.getElementById("category-list");
 
-  document.getElementById("category-list").innerHTML = categories.length
+  list.innerHTML = categories.length
     ? categories
         .map(
           (category) => `
           <div class="row">
+            <span class="row__lead mono">${escapeHtml(category.code)}</span>
             <div class="row__main">
               <strong class="row__title">${escapeHtml(category.name)}</strong>
-              <span class="row__sub">Code ${category.code} · ${category.archiveCount} archives · ${category.videoCount} videos</span>
+              <span class="row__sub">${plural(category.archiveCount, "archive")} · ${plural(category.videoCount, "video")}</span>
             </div>
           </div>`,
         )
         .join("")
-    : '<p class="empty">No category codes yet. Create one above.</p>';
+    : `<div class="empty">${icon("grid")}No category codes yet. Create your first one above.</div>`;
+  stagger(list, ".row");
 
   const options = categories
-    .map((category) => `<option value="${category.code}">${category.code} — ${escapeHtml(category.name)}</option>`)
+    .map((category) => `<option value="${escapeHtml(category.code)}">${escapeHtml(category.code)} · ${escapeHtml(category.name)}</option>`)
     .join("");
 
   document.getElementById("archive-category").innerHTML = options || '<option value="">Create a category first</option>';
@@ -155,11 +194,12 @@ document.getElementById("category-form").addEventListener("submit", async (event
   event.preventDefault();
   setError("category-error", "");
   try {
-    await api.post("/api/admin/categories", {
+    const created = await api.post("/api/admin/categories", {
       code: document.getElementById("category-code").value.trim(),
       name: document.getElementById("category-name").value.trim(),
     });
     document.getElementById("category-form").reset();
+    toast(`Category ${created.code} created`, { tone: "ok" });
     await Promise.all([loadCategories(), loadDashboard()]);
   } catch (error) {
     setError("category-error", describe(error));
@@ -169,35 +209,49 @@ document.getElementById("category-form").addEventListener("submit", async (event
 async function loadArchives() {
   const { archives } = await api.get("/api/admin/archives");
   state.archives = archives;
+  const list = document.getElementById("archive-list");
 
-  document.getElementById("archive-list").innerHTML = archives.length
+  list.innerHTML = archives.length
     ? archives
         .map(
           (archive) => `
           <div class="row">
+            <span class="row__lead">${icon("layers")}</span>
             <div class="row__main">
               <strong class="row__title">${escapeHtml(archive.name)}</strong>
-              <span class="row__sub">Category ${archive.categoryCode} · ${archive.videoCount} videos</span>
+              <span class="row__sub">Category ${escapeHtml(archive.categoryCode)} · ${plural(archive.videoCount, "video")}</span>
             </div>
-            <button class="btn btn--danger btn--sm" data-del-archive="${archive.id}" type="button">Delete</button>
+            <button class="btn btn--danger btn--sm" data-del-archive="${archive.id}" type="button">${icon("trash")}Delete</button>
           </div>`,
         )
         .join("")
-    : '<p class="empty">No archives yet.</p>';
+    : `<div class="empty">${icon("layers")}No archives yet.</div>`;
+  stagger(list, ".row");
+  enhanceButtons(list);
 
-  document.querySelectorAll("[data-del-archive]").forEach((button) => {
+  list.querySelectorAll("[data-del-archive]").forEach((button) => {
     button.addEventListener("click", async () => {
       const archive = archives.find((item) => item.id === button.dataset.delArchive);
-      if (!window.confirm(`Delete "${archive.name}" and its ${archive.videoCount} video entries?\n\nThe video files on your server are NOT deleted.`)) {
-        return;
+      const confirmed = await confirmSheet({
+        title: `Delete “${archive.name}”?`,
+        message: `This removes the archive and its ${plural(archive.videoCount, "video")} from the site. The files on your server are not touched.`,
+        confirmLabel: "Delete archive",
+        danger: true,
+      });
+      if (!confirmed) return;
+
+      try {
+        await api.del(`/api/admin/archives/${archive.id}`);
+        toast(`“${archive.name}” deleted`, { tone: "ok" });
+        await Promise.all([loadArchives(), loadCategories(), loadDashboard()]);
+      } catch (error) {
+        toast(describe(error), { tone: "error" });
       }
-      await api.del(`/api/admin/archives/${button.dataset.delArchive}`);
-      await Promise.all([loadArchives(), loadDashboard()]);
     });
   });
 
   const importOptions = archives
-    .map((archive) => `<option value="${archive.id}">${escapeHtml(archive.name)} (cat ${archive.categoryCode})</option>`)
+    .map((archive) => `<option value="${archive.id}">${escapeHtml(archive.name)} · cat ${escapeHtml(archive.categoryCode)}</option>`)
     .join("");
   document.getElementById("import-archive").innerHTML = importOptions || '<option value="">Create an archive first</option>';
   refreshImportButton();
@@ -207,16 +261,49 @@ document.getElementById("archive-form").addEventListener("submit", async (event)
   event.preventDefault();
   setError("archive-error", "");
   try {
-    await api.post("/api/admin/archives", {
+    const created = await api.post("/api/admin/archives", {
       categoryCode: document.getElementById("archive-category").value,
       name: document.getElementById("archive-name").value.trim(),
     });
     document.getElementById("archive-name").value = "";
+    toast(`Archive “${created.name}” created`, { tone: "ok" });
     await Promise.all([loadArchives(), loadCategories(), loadDashboard()]);
   } catch (error) {
     setError("archive-error", describe(error));
   }
 });
+
+function renderCrumbs(relPath) {
+  const nav = document.getElementById("fs-path");
+  const parts = relPath ? relPath.split("/") : [];
+
+  const crumbs = [`<button class="crumb${parts.length ? "" : " is-current"}" data-crumb="" type="button">/</button>`];
+  parts.forEach((part, index) => {
+    const target = parts.slice(0, index + 1).join("/");
+    if (index > 0) crumbs.push('<span class="crumb-sep" aria-hidden="true">/</span>');
+    const current = index === parts.length - 1;
+    crumbs.push(
+      `<button class="crumb${current ? " is-current" : ""}" data-crumb="${escapeHtml(target)}" type="button"${current ? ' aria-current="page"' : ""}>${escapeHtml(part)}</button>`,
+    );
+  });
+
+  nav.innerHTML = crumbs.join("");
+  nav.querySelectorAll("[data-crumb]").forEach((crumb) => {
+    crumb.addEventListener("click", () => {
+      select(crumb.dataset.crumb, "directory");
+      browse(crumb.dataset.crumb);
+    });
+  });
+  nav.scrollLeft = nav.scrollWidth;
+}
+
+function fileGlyph(entry) {
+  if (entry.type === "directory") return icon("folder");
+  if (entry.kind === "archive") return icon("box");
+  if (entry.kind === "video") return icon("film");
+  if (entry.kind === "image") return icon("image");
+  return icon("doc");
+}
 
 async function browse(relPath) {
   setError("fs-error", "");
@@ -224,22 +311,13 @@ async function browse(relPath) {
     const listing = await api.get(`/api/admin/files?path=${encodeURIComponent(relPath)}`);
     state.cwd = listing.relPath;
 
-    document.getElementById("fs-path").textContent = `/${listing.relPath}`;
+    renderCrumbs(listing.relPath);
     document.getElementById("fs-up").disabled = listing.isRoot;
 
-    document.getElementById("fs-list").innerHTML = listing.entries.length
+    const list = document.getElementById("fs-list");
+    list.innerHTML = listing.entries.length
       ? listing.entries
           .map((entry) => {
-            const glyph =
-              entry.type === "directory"
-                ? icon("folder")
-                : entry.kind === "archive"
-                  ? icon("box")
-                  : entry.kind === "video"
-                    ? icon("film")
-                    : entry.kind === "image"
-                      ? icon("image")
-                      : icon("doc");
             const meta =
               entry.type === "directory"
                 ? "folder"
@@ -250,15 +328,16 @@ async function browse(relPath) {
 
             return `
               <div class="fsrow${selectable ? " is-selectable" : ""}" data-path="${escapeHtml(entry.relPath)}" data-type="${entry.type}" data-kind="${entry.kind}">
-                <span class="fsrow__icon">${glyph}</span>
+                <span class="fsrow__icon">${fileGlyph(entry)}</span>
                 <span class="fsrow__name">${escapeHtml(entry.name)}</span>
                 <span class="fsrow__meta">${meta}</span>
               </div>`;
           })
           .join("")
-      : '<p class="empty">This folder is empty.</p>';
+      : `<div class="empty">${icon("folder")}This folder is empty.</div>`;
+    stagger(list, ".fsrow");
 
-    document.querySelectorAll(".fsrow").forEach((row) => {
+    list.querySelectorAll(".fsrow").forEach((row) => {
       row.addEventListener("click", () => {
         if (row.dataset.type === "directory") {
           select(row.dataset.path, "directory");
@@ -266,7 +345,7 @@ async function browse(relPath) {
           return;
         }
         if (row.dataset.kind === "video" || row.dataset.kind === "archive") {
-          document.querySelectorAll(".fsrow").forEach((node) => node.classList.remove("is-selected"));
+          list.querySelectorAll(".fsrow").forEach((node) => node.classList.remove("is-selected"));
           row.classList.add("is-selected");
           select(row.dataset.path, row.dataset.kind);
         }
@@ -279,7 +358,8 @@ async function browse(relPath) {
 
 function select(relPath, kind) {
   state.selection = { relPath, kind };
-  document.getElementById("import-selection").textContent = `/${relPath} (${kind})`;
+  const label = kind === "directory" ? "folder" : kind === "archive" ? "zip file" : "video";
+  document.getElementById("import-selection").textContent = `/${relPath} · ${label}`;
   refreshImportButton();
 }
 
@@ -300,7 +380,7 @@ document.getElementById("import-button").addEventListener("click", async () => {
   const button = document.getElementById("import-button");
   const result = document.getElementById("import-result");
   button.disabled = true;
-  button.textContent = "Importing…";
+  button.innerHTML = '<span class="spinner spinner--sm"></span>Importing';
   result.hidden = true;
   setError("fs-error", "");
 
@@ -310,15 +390,16 @@ document.getElementById("import-button").addEventListener("click", async () => {
     });
 
     const parts = [
-      `${response.added} video${response.added === 1 ? "" : "s"} added`,
+      `${plural(response.added, "video")} added`,
       response.skipped ? `${response.skipped} already present` : null,
-      response.notPlayable ? `${response.notPlayable} need transcoding to play in a browser` : null,
+      response.notPlayable ? `${response.notPlayable} need transcoding` : null,
       response.extraction ? `${response.extraction.extracted} extracted from the zip` : null,
       response.extraction?.skipped ? `${response.extraction.skipped} unsafe zip entries skipped` : null,
     ].filter(Boolean);
 
     result.textContent = parts.join(" · ");
     result.hidden = false;
+    toast(`${plural(response.added, "video")} imported`, { tone: "ok" });
     await Promise.all([loadArchives(), loadCategories(), loadDashboard()]);
   } catch (error) {
     setError("fs-error", describe(error));
@@ -339,8 +420,11 @@ document.getElementById("key-form").addEventListener("submit", async (event) => 
       label: document.getElementById("key-label").value.trim() || undefined,
     });
 
+    const output = document.getElementById("key-output");
     document.getElementById("key-value").textContent = created.key;
-    document.getElementById("key-output").hidden = false;
+    output.hidden = true;
+    void output.offsetWidth;
+    output.hidden = false;
     document.getElementById("key-label").value = "";
     await Promise.all([loadKeys(), loadDashboard()]);
   } catch (error) {
@@ -348,16 +432,35 @@ document.getElementById("key-form").addEventListener("submit", async (event) => 
   }
 });
 
+const daysInput = document.getElementById("key-days");
+const presets = document.getElementById("day-presets");
+
+function markPreset() {
+  presets.querySelectorAll(".preset").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.days === daysInput.value);
+  });
+}
+
+presets.querySelectorAll(".preset").forEach((button) => {
+  button.addEventListener("click", () => {
+    daysInput.value = button.dataset.days;
+    markPreset();
+  });
+});
+
+daysInput.addEventListener("input", markPreset);
+
 document.getElementById("key-copy").addEventListener("click", async () => {
-  const button = document.getElementById("key-copy");
+  const label = document.getElementById("key-copy-label");
   try {
     await navigator.clipboard.writeText(document.getElementById("key-value").textContent);
-    button.textContent = "Copied";
+    label.textContent = "Copied";
+    toast("Key copied to clipboard", { tone: "ok" });
   } catch {
-    button.textContent = "Select it manually";
+    label.textContent = "Select it manually";
   }
   setTimeout(() => {
-    button.textContent = "Copy key";
+    label.textContent = "Copy key";
   }, 1800);
 });
 
@@ -369,48 +472,62 @@ async function loadKeys() {
   if (search) query.set("search", search);
 
   const { items, total } = await api.get(`/api/admin/keys?${query}`);
+  const list = document.getElementById("key-list");
 
-  document.getElementById("key-list").innerHTML = items.length
+  list.innerHTML = items.length
     ? `<p class="list__count">${items.length} of ${total}</p>` +
       items
         .map((key) => {
           const tone = key.status === "active" ? "ok" : key.status === "expired" ? "warn" : "bad";
           return `
             <div class="row">
+              <span class="row__lead">${icon("key")}</span>
               <div class="row__main">
                 <strong class="row__title mono">${escapeHtml(key.keyHint)}</strong>
                 <span class="row__sub">
-                  ${key.label ? `${escapeHtml(key.label)} · ` : ""}Category ${key.categoryCode}
+                  ${key.label ? `${escapeHtml(key.label)} · ` : ""}Category ${escapeHtml(key.categoryCode)}
                   · ends ${formatDate(key.planExpiresAt)}
                   · ${key.boundIp ? `locked to ${escapeHtml(key.boundIp)}` : "not yet claimed"}
                 </span>
               </div>
               <div class="row__actions">
                 <span class="pill pill--${tone}">${key.status}</span>
-                ${key.status === "active" ? `<button class="btn btn--danger btn--sm" data-expire="${key.id}" type="button">Expire now</button>` : `<button class="btn btn--ghost btn--sm" data-extend="${key.id}" type="button">+30 days</button>`}
-                ${key.boundIp ? `<button class="btn btn--ghost btn--sm" data-release="${key.id}" type="button">Unlock IP</button>` : ""}
+                ${key.status === "active" ? `<button class="btn btn--danger btn--sm" data-expire="${key.id}" type="button">Expire now</button>` : `<button class="btn btn--ghost btn--sm" data-extend="${key.id}" type="button">${icon("plus")}30 days</button>`}
+                ${key.boundIp ? `<button class="btn btn--ghost btn--sm" data-release="${key.id}" type="button">${icon("unlock")}Unlock IP</button>` : ""}
               </div>
             </div>`;
         })
         .join("")
-    : '<p class="empty">No keys match.</p>';
+    : `<div class="empty">${icon("key")}No keys match.</div>`;
+  stagger(list, ".row");
+  enhanceButtons(list);
 
-  bindKeyAction("data-expire", "expire", "Expire this subscription now? The viewer is signed out immediately.");
-  bindKeyAction("data-extend", "extend", null, { additionalDays: 30 });
-  bindKeyAction("data-release", "release-ip", "Unlock the IP binding so this key can be claimed from a new network?");
+  bindKeyAction(list, "data-expire", "expire", {
+    title: "Expire this subscription now?",
+    message: "The viewer is signed out immediately and the key stops working. You can extend it again later.",
+    confirmLabel: "Expire now",
+    danger: true,
+  }, null, "Subscription expired");
+  bindKeyAction(list, "data-extend", "extend", null, { additionalDays: 30 }, "Extended by 30 days");
+  bindKeyAction(list, "data-release", "release-ip", {
+    title: "Unlock the network binding?",
+    message: "The key can then be claimed from a new network. Any open session on the old one is signed out.",
+    confirmLabel: "Unlock IP",
+  }, null, "IP binding released");
 }
 
-function bindKeyAction(attribute, path, confirmMessage, body) {
-  document.querySelectorAll(`[${attribute}]`).forEach((button) => {
+function bindKeyAction(root, attribute, path, confirmOptions, body, successMessage) {
+  root.querySelectorAll(`[${attribute}]`).forEach((button) => {
     button.addEventListener("click", async () => {
-      if (confirmMessage && !window.confirm(confirmMessage)) return;
+      if (confirmOptions && !(await confirmSheet(confirmOptions))) return;
       const id = button.getAttribute(attribute);
       button.disabled = true;
       try {
         await api.post(`/api/admin/keys/${id}/${path}`, body);
+        toast(successMessage, { tone: "ok" });
         await Promise.all([loadKeys(), loadDashboard()]);
       } catch (error) {
-        window.alert(describe(error));
+        toast(describe(error), { tone: "error" });
         button.disabled = false;
       }
     });
@@ -431,6 +548,7 @@ document.getElementById("broadcast-form").addEventListener("submit", async (even
       categoryCode: document.getElementById("bc-category").value || null,
     });
     document.getElementById("bc-message").value = "";
+    toast("Broadcast sent to every open screen", { tone: "ok" });
     await Promise.all([loadBroadcasts(), loadDashboard()]);
   } catch (error) {
     setError("bc-error", describe(error));
@@ -439,12 +557,14 @@ document.getElementById("broadcast-form").addEventListener("submit", async (even
 
 async function loadBroadcasts() {
   const { broadcasts } = await api.get("/api/admin/broadcasts");
+  const list = document.getElementById("broadcast-list");
 
-  document.getElementById("broadcast-list").innerHTML = broadcasts.length
+  list.innerHTML = broadcasts.length
     ? broadcasts
         .map(
           (broadcast) => `
           <div class="row">
+            <span class="row__lead">${icon("megaphone")}</span>
             <div class="row__main">
               <strong class="row__title">${escapeHtml(broadcast.title)}</strong>
               <span class="row__sub">
@@ -453,17 +573,20 @@ async function loadBroadcasts() {
               </span>
             </div>
             <div class="row__actions">
-              ${broadcast.active ? '<span class="pill pill--ok">Showing</span>' : '<span class="pill">Closed</span>'}
+              ${broadcast.active ? '<span class="pill pill--live">Showing</span>' : '<span class="pill">Closed</span>'}
               ${broadcast.active ? `<button class="btn btn--ghost btn--sm" data-stop="${broadcast.id}" type="button">Stop</button>` : ""}
             </div>
           </div>`,
         )
         .join("")
-    : '<p class="empty">Nothing sent yet.</p>';
+    : `<div class="empty">${icon("megaphone")}Nothing sent yet.</div>`;
+  stagger(list, ".row");
+  enhanceButtons(list);
 
-  document.querySelectorAll("[data-stop]").forEach((button) => {
+  list.querySelectorAll("[data-stop]").forEach((button) => {
     button.addEventListener("click", async () => {
       await api.post(`/api/admin/broadcasts/${button.dataset.stop}/deactivate`);
+      toast("Broadcast stopped", { tone: "ok" });
       await Promise.all([loadBroadcasts(), loadDashboard()]);
     });
   });
@@ -472,26 +595,29 @@ async function loadBroadcasts() {
 async function loadActivity() {
   try {
     const [live, audit] = await Promise.all([api.get("/api/admin/live"), api.get("/api/admin/audit")]);
+    const liveList = document.getElementById("live-list");
+    const auditList = document.getElementById("audit-list");
 
-    document.getElementById("live-list").innerHTML = live.viewers.length
+    liveList.innerHTML = live.viewers.length
       ? live.viewers
           .map(
             (viewer) => `
             <div class="row">
+              <span class="row__lead">${icon("eye")}</span>
               <div class="row__main">
                 <strong class="row__title mono">${escapeHtml(viewer.keyHint)}</strong>
                 <span class="row__sub">
-                  Category ${viewer.categoryCode} · ${escapeHtml(viewer.ipFingerprint)}
-                  · last seen ${new Date(viewer.lastSeenAt).toLocaleTimeString()}
+                  Category ${escapeHtml(viewer.categoryCode)} · ${escapeHtml(viewer.ipFingerprint)}
+                  · seen ${new Date(viewer.lastSeenAt).toLocaleTimeString()}
                 </span>
               </div>
               <span class="pill pill--live">live</span>
             </div>`,
           )
           .join("")
-      : '<p class="empty">Nobody is watching right now.</p>';
+      : `<div class="empty">${icon("eye")}Nobody is watching right now.</div>`;
 
-    document.getElementById("audit-list").innerHTML = audit.entries.length
+    auditList.innerHTML = audit.entries.length
       ? audit.entries
           .map(
             (entry) => `
@@ -504,9 +630,9 @@ async function loadActivity() {
             </div>`,
           )
           .join("")
-      : '<p class="empty">No activity recorded yet.</p>';
+      : `<div class="empty">${icon("activity")}No activity recorded yet.</div>`;
   } catch {
-    /* dashboard handles auth failures */
+    return;
   }
 }
 
@@ -518,10 +644,10 @@ function debounce(fn, delay) {
   };
 }
 
+trackScroll();
+enhanceButtons();
+
 api
   .get("/api/admin/overview")
   .then(() => enterConsole())
-  .catch(() => {
-    loginView.hidden = false;
-    document.getElementById("admin-token").focus();
-  });
+  .catch(() => showLogin());

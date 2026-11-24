@@ -4,11 +4,31 @@ const PROGRESS_INTERVAL_MS = 10000;
 const TOKEN_REFRESH_RATIO = 0.55;
 const WATERMARK_MOVE_MS = 23000;
 
-function createPlayer({ onError, onAuthError }) {
+function formatClock(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = String(total % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${secs}` : `${minutes}:${secs}`;
+}
+
+function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume = () => {} }) {
   const video = document.getElementById("player-video");
   const stage = document.getElementById("player-stage");
   const spinner = document.getElementById("player-spinner");
   const watermark = document.getElementById("player-watermark");
+  const resumeChip = document.getElementById("player-resume");
+  let chipTimer = null;
+
+  function showChip(text) {
+    clearTimeout(chipTimer);
+    resumeChip.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span></span>`;
+    resumeChip.querySelector("span").textContent = text;
+    resumeChip.hidden = false;
+    chipTimer = setTimeout(() => {
+      resumeChip.hidden = true;
+    }, 2600);
+  }
 
   let current = null;
   let token = null;
@@ -61,17 +81,13 @@ function createPlayer({ onError, onAuthError }) {
     };
 
     if (keepalive) {
-      try {
-        await fetch(`/api/videos/${current.id}/progress`, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        });
-      } catch {
-        /* page is unloading */
-      }
+      await fetch(`/api/videos/${current.id}/progress`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(() => null);
       return;
     }
 
@@ -133,6 +149,7 @@ function createPlayer({ onError, onAuthError }) {
           () => {
             if (videoDoc.progressSeconds < video.duration - 10) {
               video.currentTime = videoDoc.progressSeconds;
+              showChip(`Resuming from ${formatClock(videoDoc.progressSeconds)}`);
             }
           },
           { once: true },
@@ -166,9 +183,14 @@ function createPlayer({ onError, onAuthError }) {
 
     if (current && video.currentTime > 1) saveProgress({ keepalive: true });
 
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
+    clearTimeout(chipTimer);
+    resumeChip.hidden = true;
+
+    if (video.getAttribute("src")) {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
     current = null;
     token = null;
     setSpinner(false);
@@ -178,9 +200,14 @@ function createPlayer({ onError, onAuthError }) {
   video.addEventListener("playing", () => setSpinner(false));
   video.addEventListener("canplay", () => setSpinner(false));
   video.addEventListener("pause", () => saveProgress());
-  video.addEventListener("ended", () => saveProgress());
+  video.addEventListener("ended", () => {
+    saveProgress();
+    if (current) onEnded(current);
+  });
+  video.addEventListener("play", () => onUserResume());
 
   video.addEventListener("seeking", async () => {
+    onUserResume();
     if (tokenIsStale() && !recovering) await recoverPlayback();
   });
 
