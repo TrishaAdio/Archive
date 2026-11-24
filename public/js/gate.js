@@ -172,26 +172,38 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-function settleSealVideo() {
-  const saveData = navigator.connection?.saveData;
-  if (prefersReducedMotion() || saveData) {
-    sealVideo.removeAttribute("autoplay");
-    sealVideo.pause();
-    return;
+function startSealVideo(preloadedUrl) {
+  if (prefersReducedMotion() || navigator.connection?.saveData) return;
+
+  if (preloadedUrl) {
+    sealVideo.src = preloadedUrl;
+  } else {
+    for (const [type, url] of [
+      ["video/webm", sealVideo.dataset.webm],
+      ["video/mp4", sealVideo.dataset.mp4],
+    ]) {
+      const source = document.createElement("source");
+      source.src = url;
+      source.type = type;
+      sealVideo.appendChild(source);
+    }
   }
+
+  sealVideo.preload = "auto";
+  sealVideo.load();
   sealVideo.play().catch(() => null);
 }
 
 enhanceButtons();
 showReasonFromUrl();
-settleSealVideo();
 
 const sessionCheck = api.get("/api/gate/me").then(
   () => true,
   () => false,
 );
 
-runSplash().then(async () => {
+runSplash().then(async ({ videoUrl }) => {
+  startSealVideo(videoUrl);
   revealOnScroll();
   if (await sessionCheck) {
     window.location.replace("/watch");
