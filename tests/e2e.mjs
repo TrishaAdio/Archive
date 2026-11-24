@@ -566,13 +566,47 @@ async function main() {
       check(`${label} has no inline <style> block`, !/<style[^>]*>/i.test(html));
       check(`${label} has no style= attribute`, !/\sstyle=/i.test(html));
 
-      for (const match of html.matchAll(/(?:href|src)="(\/[^"]+)"/g)) referenced.add(match[1]);
+      for (const match of html.matchAll(/(?:href|src|poster|data-webm|data-mp4)="(\/[^"]+)"/g)) referenced.add(match[1]);
     }
+
+    const { execFileSync } = await import("node:child_process");
+    const repoRoot = path.resolve(import.meta.dirname, "..");
 
     for (const asset of [...referenced].sort()) {
       const response = await fetch(BASE + asset);
       check(`asset ${asset} loads`, response.status === 200, `got ${response.status}`);
+
+      const route = asset.split("?")[0];
+      if (route === "/watch" || route === "/admin" || route === "/") continue;
+      const filePath = `public${route}`;
+      const ignored = (() => {
+        try {
+          execFileSync("git", ["check-ignore", "-q", filePath], { cwd: repoRoot });
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      check(`asset ${asset} is not excluded by .gitignore, so it deploys`, !ignored, filePath);
     }
+
+    const cssResponse = await fetch(`${BASE}/css/theme.css`);
+    check("stylesheets revalidate on every load so updates show at once", cssResponse.headers.get("cache-control") === "no-cache", String(cssResponse.headers.get("cache-control")));
+    const scriptResponse = await fetch(`${BASE}/js/gate.js`);
+    check("scripts revalidate on every load", scriptResponse.headers.get("cache-control") === "no-cache", String(scriptResponse.headers.get("cache-control")));
+    const etag = cssResponse.headers.get("etag");
+    const { request: httpRequest } = await import("node:http");
+    const revalidatedStatus = await new Promise((resolve, reject) => {
+      const req = httpRequest(`${BASE}/css/theme.css`, { headers: { "if-none-match": etag } }, (res) => {
+        res.resume();
+        resolve(res.statusCode);
+      });
+      req.on("error", reject);
+      req.end();
+    });
+    check("unchanged stylesheet answers 304 so revalidation stays cheap", Boolean(etag) && revalidatedStatus === 304, `etag ${etag}, got ${revalidatedStatus}`);
+    const videoResponse = await fetch(`${BASE}/media/seal.webm`, { method: "HEAD" });
+    check("video revalidates so a replaced clip shows at once", videoResponse.headers.get("cache-control") === "no-cache", String(videoResponse.headers.get("cache-control")));
 
     for (const fontFile of [
       "plus-jakarta-sans-latin.woff2",
