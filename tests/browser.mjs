@@ -176,15 +176,16 @@ async function main() {
     check("splash reached 100% before leaving", (await page.locator("#splash-pct").textContent()).trim() === "100%");
     check("splash marks itself as seen", (await page.evaluate(() => localStorage.getItem("gp_splash_v1"))) === "1");
 
-    const warmed = await page.evaluate(() =>
-      performance
-        .getEntriesByType("resource")
-        .map((entry) => new URL(entry.name).pathname)
-        .filter((pathname) => /\/media\/seal\.(webm|mp4)$|\/img\/characters\/|\/js\/app\.js$/.test(pathname)),
+    const fetched = await page.evaluate(() =>
+      performance.getEntriesByType("resource").map((entry) => new URL(entry.name).pathname),
     );
-    check("splash preloaded the seal video", warmed.some((item) => item.startsWith("/media/seal.")), warmed.join(","));
-    check("splash preloaded every character image", new Set(warmed.filter((item) => item.includes("/characters/"))).size === 5, warmed.join(","));
-    check("splash prefetched the home page script", warmed.includes("/js/app.js"));
+    const videoDownloads = fetched.filter((item) => /^\/media\/seal\.(webm|mp4)$/.test(item));
+    check("splash downloads the butterfly video", videoDownloads.length >= 1, fetched.join(","));
+    check("butterfly video is downloaded only once", videoDownloads.length === 1, videoDownloads.join(","));
+    check("splash does not prefetch the home page script", !fetched.includes("/js/app.js"), fetched.join(","));
+    check("splash does not prefetch home page styles", !fetched.includes("/css/app.css"));
+    check("splash does not prefetch the hero character", !fetched.includes("/img/characters/rize-lean.webp"));
+    check("splash shows the butterfly step text", /butterfly|ready|almost/i.test(await page.locator("#splash-step").textContent()));
 
     section("Gate page in a real browser (mobile viewport)");
     check("wordmark rendered", (await page.locator(".gate__title").textContent()).includes("Get"));
@@ -229,7 +230,17 @@ async function main() {
     }));
     check("seal video plays in the circle", sealVideo.width > 0, JSON.stringify(sealVideo));
     check("seal video is muted and loops", sealVideo.muted && sealVideo.loop);
-    check("seal video is self-hosted", new URL(sealVideo.src).host === new URL(BASE).host, sealVideo.src);
+    check("seal plays from the copy the splash downloaded", sealVideo.src.startsWith("blob:"), sealVideo.src);
+
+    const smooth = await page.locator("#seal-video").evaluate(async (video) => {
+      const start = video.currentTime;
+      let stalls = 0;
+      video.addEventListener("waiting", () => stalls++);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return { advanced: video.currentTime - start, stalls, buffered: video.buffered.length ? video.buffered.end(0) : 0, duration: video.duration };
+    });
+    check("butterfly plays without stalling", smooth.stalls === 0 && smooth.advanced > 0.8, JSON.stringify(smooth));
+    check("whole butterfly loop is buffered", smooth.buffered >= smooth.duration - 0.1, JSON.stringify(smooth));
     check("seal is clipped to a circle", sealVideo.radius === "50%", sealVideo.radius);
 
     const halo = await page.locator(".seal__halo").evaluate((node) => getComputedStyle(node).backgroundImage);
@@ -578,6 +589,9 @@ async function main() {
     await page.waitForURL((url) => !url.pathname.startsWith("/watch"), { timeout: 40000 });
     check("expired viewer is thrown back to the gate", !page.url().includes("/watch"), `at ${page.url()}`);
     check("splash does not repeat on a later visit", await page.locator("#splash").isHidden());
+    await page.waitForFunction(() => document.getElementById("seal-video")?.currentSrc, { timeout: 8000 });
+    const laterSrc = await page.locator("#seal-video").evaluate((video) => new URL(video.currentSrc).pathname);
+    check("later visits play the butterfly straight from the server", /^\/media\/seal\.(webm|mp4)$/.test(laterSrc), laterSrc);
     await page.waitForSelector("#gate-reason:not([hidden])", { timeout: 6000 });
     check("the gate explains why the viewer was signed out", (await page.locator("#gate-reason").textContent()).includes("session has ended"));
     check("the reason is removed from the address bar", !page.url().includes("reason="), page.url());

@@ -81,8 +81,8 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 ## Tests
 
 ```bash
-npm run test:e2e        # 214 API and security checks against a temporary MongoDB
-npm run test:browser    # 129 checks driving real Chromium, including video playback
+npm run test:e2e        # 212 API and security checks against a temporary MongoDB
+npm run test:browser    # 135 checks driving real Chromium, including video playback
 npm run screenshots     # writes screenshots/ for a visual pass
 ```
 
@@ -303,9 +303,9 @@ a slow aurora and a faint film grain.
 ### Interaction
 
 - **First visit:** a splash screen shows the banner with "Wait, loading your experience" and a
-  real progress bar while it downloads the seal video, fonts, character art and the home page
-  scripts. It stays at least 2.2 seconds, gives up waiting after 10, and only appears once per
-  browser.
+  progress bar while it downloads the butterfly video, and nothing else. The circle then plays
+  that downloaded copy, so the loop runs without stalling. It stays at least 2.2 seconds, gives up
+  waiting after 10, and only appears once per browser; later visits stream the video normally.
 - **Gate:** a circular seal playing a looping video, with a pink and cyan glow on its sides. A
   character peeks over the key card: she smiles while idle, a different character looks down when
   a key is wrong, and a happy one hops on success.
