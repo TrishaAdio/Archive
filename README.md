@@ -81,8 +81,8 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 ## Tests
 
 ```bash
-npm run test:e2e        # 188 API and security checks against a temporary MongoDB
-npm run test:browser    # 98 checks driving real Chromium, including video playback
+npm run test:e2e        # 214 API and security checks against a temporary MongoDB
+npm run test:browser    # 129 checks driving real Chromium, including video playback
 npm run screenshots     # writes screenshots/ for a visual pass
 ```
 
@@ -291,21 +291,31 @@ The direction is editorial and nocturnal, closer to a fashion magazine than a da
 
 | Role | Typeface | Why |
 | --- | --- | --- |
-| Display | Bodoni Moda, roman and italic | High-contrast didone for headlines; the italic carries the accent words |
-| Interface | Schibsted Grotesk | A newspaper grotesk; clearer at small sizes than the usual UI defaults |
+| Headings and text | Plus Jakarta Sans | Tall x-height and open letter shapes stay clear at 12px on phones, and its 800 weight gives tight, heavy headlines |
+| Accent words | Bodoni Moda italic | The high-contrast italic sets words like *Pleasure* and *archives* apart from the sans |
 | Codes and numbers | Martian Mono | Keys, `#numbers`, timers and labels, so identifiers always read as data |
 
-All three are variable WOFF2 under the SIL Open Font License, self-hosted so no third party sees
-your traffic. Colour runs from rose through peach to champagne over a violet-black background with
+A high-contrast serif italic next to a plain sans is a standard editorial pairing: the two never
+compete because their roles are obvious. All three are variable WOFF2 files under the SIL Open
+Font License, self-hosted so no third party sees your traffic. Colour runs from rose through peach to champagne over a violet-black background with
 a slow aurora and a faint film grain.
 
 ### Interaction
 
-- **Gate:** a pulsing seal whose lock opens on success, a gradient ring around the focused key
-  field, a Paste button for mobile, and a shake with haptic buzz on a wrong key. When a viewer is
-  signed out, the gate explains why.
-- **Home:** a time-of-day greeting, stat chips, and archive cards built from a mosaic of the three
-  most-watched thumbnails. On desktop the cards tilt and light up under the pointer.
+- **First visit:** a splash screen shows the banner with "Wait, loading your experience" and a
+  real progress bar while it downloads the seal video, fonts, character art and the home page
+  scripts. It stays at least 2.2 seconds, gives up waiting after 10, and only appears once per
+  browser.
+- **Gate:** a circular seal playing a looping video, with a pink and cyan glow on its sides. A
+  character peeks over the key card: she smiles while idle, a different character looks down when
+  a key is wrong, and a happy one hops on success.
+- **Unlock:** a correct key turns the field and button green, a gradient ring sweeps round the
+  seal, the seal thumps, shockwaves and about 34 sparks burst out, a check mark draws in, and an
+  iris wipe opens from the seal into the home page, which fades in to continue the motion.
+- **Wrong key:** the card and seal shake with a haptic buzz, and when a viewer is signed out, the
+  gate explains why.
+- **Home:** a time-of-day greeting, a character cut-out behind the hero with a slow parallax on
+  scroll, stat chips, and archive cards built from a mosaic of the three most-watched thumbnails. On desktop the cards tilt and light up under the pointer.
 - **Archive:** a sticky search that jumps straight to a number (`#42` or `42`) or matches titles,
   a sort control whose highlight slides between options, and infinite scroll.
 - **Player:** an ambient glow taken from the thumbnail, a "Resuming from 3:12" chip, a burst
@@ -319,6 +329,12 @@ a slow aurora and a faint film grain.
 View changes use the View Transitions API where the browser supports it. Primary buttons pull
 toward the pointer and ripple on press. Every animation sits behind a `prefers-reduced-motion`
 guard and collapses to near-zero duration for people who ask for less motion.
+
+Character art also appears in the account and broadcast sheets, the empty states and the owner
+login. Backgrounds were removed with the BiRefNet segmentation model, and each cut-out is a
+transparent WebP of about 15 to 42 KB. The seal loop is 400px square, about 300 KB as MP4 and
+340 KB as WebM, with a 10 KB poster shown instantly. It does not autoplay when the phone asks for
+reduced motion or data saving.
 
 The layout is mobile-first, designed at 414px wide, with tap targets of at least 40px and
 safe-area insets respected on notched phones.

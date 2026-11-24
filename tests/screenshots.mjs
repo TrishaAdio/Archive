@@ -111,11 +111,32 @@ async function main() {
     console.log(`saved ${name}.png`);
   }
 
-  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1300);
+  await page.screenshot({ path: path.join(OUT, "00-splash.png") });
+  console.log("saved 00-splash.png");
+  await page.waitForSelector("#splash", { state: "hidden", timeout: 15000 });
+  await page.waitForFunction(() => document.getElementById("seal-video")?.currentTime > 0.5, { timeout: 10000 });
   await shot("01-gate");
+
+  await page.fill("#key-input", "GP-wrong-key-for-the-screenshot");
+  await page.click("#gate-submit");
+  await page.waitForSelector("#gate-error:not([hidden])");
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: path.join(OUT, "01b-gate-wrong-key.png") });
+  console.log("saved 01b-gate-wrong-key.png");
+  await page.waitForFunction(() => document.getElementById("mascot").dataset.mood === "idle", { timeout: 6000 });
 
   await page.fill("#key-input", key.key);
   await page.click("#gate-submit");
+  await page.waitForSelector("#gate-seal.is-unlocked", { timeout: 6000 });
+  await page.waitForTimeout(260);
+  await page.screenshot({ path: path.join(OUT, "01c-gate-unlocking.png") });
+  console.log("saved 01c-gate-unlocking.png");
+  await page.waitForSelector("#iris.is-open", { timeout: 4000 });
+  await page.waitForTimeout(380);
+  await page.screenshot({ path: path.join(OUT, "01d-gate-iris.png") });
+  console.log("saved 01d-gate-iris.png");
   await page.waitForURL("**/watch");
   await page.waitForSelector(".acard");
   await shot("02-home");
@@ -149,6 +170,7 @@ async function main() {
   await shot("06-home-resume");
 
   await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+  await shot("06b-admin-login");
   await page.fill("#admin-token", ADMIN_TOKEN);
   await page.click('#login-form button[type="submit"]');
   await page.waitForSelector("#console-view:not([hidden])");
@@ -172,6 +194,8 @@ async function main() {
   const desktop = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const desktopPage = await desktop.newPage();
   await desktopPage.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await desktopPage.waitForSelector("#splash", { state: "hidden", timeout: 15000 });
+  await desktopPage.screenshot({ path: path.join(OUT, "11a-desktop-gate.png") });
   await desktopPage.fill("#key-input", key.key);
   await desktopPage.click("#gate-submit");
   await desktopPage.waitForURL("**/watch");

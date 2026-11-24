@@ -154,42 +154,124 @@ async function main() {
     });
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
-    section("Gate page in a real browser (mobile viewport)");
-    await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    section("First-visit splash screen");
+    const splashStarted = Date.now();
+    await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+    check("splash is shown on the very first visit", await page.locator("#splash").isVisible());
+    check("splash says it is loading the experience", /loading your experience/i.test(await page.locator(".splash__title").textContent()));
 
+    await page.waitForFunction(() => {
+      const img = document.querySelector(".splash__banner");
+      return img && img.complete && img.naturalWidth > 0;
+    }, { timeout: 8000 });
+    check("splash banner image loaded", true);
+
+    const midProgress = await page.locator("#splash-pct").textContent();
+    check("splash shows a percentage", /^\d+%$/.test(midProgress.trim()), `got ${midProgress}`);
+
+    await page.waitForSelector("#splash", { state: "hidden", timeout: 15000 });
+    const splashMs = Date.now() - splashStarted;
+    check("splash stays long enough to be seen", splashMs >= 2000, `${splashMs} ms`);
+    check("splash gives way within the time limit", splashMs < 13000, `${splashMs} ms`);
+    check("splash reached 100% before leaving", (await page.locator("#splash-pct").textContent()).trim() === "100%");
+    check("splash marks itself as seen", (await page.evaluate(() => localStorage.getItem("gp_splash_v1"))) === "1");
+
+    const warmed = await page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .map((entry) => new URL(entry.name).pathname)
+        .filter((pathname) => /\/media\/seal\.(webm|mp4)$|\/img\/characters\/|\/js\/app\.js$/.test(pathname)),
+    );
+    check("splash preloaded the seal video", warmed.some((item) => item.startsWith("/media/seal.")), warmed.join(","));
+    check("splash preloaded every character image", new Set(warmed.filter((item) => item.includes("/characters/"))).size === 5, warmed.join(","));
+    check("splash prefetched the home page script", warmed.includes("/js/app.js"));
+
+    section("Gate page in a real browser (mobile viewport)");
     check("wordmark rendered", (await page.locator(".gate__title").textContent()).includes("Get"));
     check("key input visible", await page.locator("#key-input").isVisible());
     check("trust list has four points", (await page.locator(".gate__trust-item").count()) === 4);
 
-    const fontFamily = await page.locator(".gate__title").evaluate((node) => getComputedStyle(node).fontFamily);
-    check("editorial display font applied", fontFamily.includes("Bodoni Moda"), `got ${fontFamily}`);
+    const titleFont = await page.locator(".gate__title").evaluate((node) => getComputedStyle(node).fontFamily);
+    check("headings use Plus Jakarta Sans", titleFont.includes("Plus Jakarta Sans"), `got ${titleFont}`);
+    const accentFont = await page.locator(".gate__title em").evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { family: style.fontFamily, style: style.fontStyle };
+    });
+    check("accent words keep the Bodoni Moda italic", accentFont.family.includes("Bodoni Moda") && accentFont.style === "italic", JSON.stringify(accentFont));
 
     await page.evaluate(() => document.fonts.ready);
     const fonts = await page.evaluate(() => ({
-      display: document.fonts.check('600 40px "Bodoni Moda"'),
+      sans: document.fonts.check('500 16px "Plus Jakarta Sans"'),
+      sansBold: document.fonts.check('800 40px "Plus Jakarta Sans"'),
       italic: document.fonts.check('italic 500 40px "Bodoni Moda"'),
-      ui: document.fonts.check('500 16px "Schibsted Grotesk"'),
       mono: document.fonts.check('500 12px "Martian Mono"'),
     }));
-    check("display serif loaded", fonts.display);
-    check("italic display serif loaded", fonts.italic);
-    check("ui grotesk loaded", fonts.ui);
+    check("Plus Jakarta Sans loaded", fonts.sans);
+    check("Plus Jakarta Sans bold weight available", fonts.sansBold);
+    check("Bodoni Moda italic loaded", fonts.italic);
     check("mono font loaded", fonts.mono);
 
     const bodyFont = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
-    check("body text uses Schibsted Grotesk", bodyFont.includes("Schibsted Grotesk"), `got ${bodyFont}`);
+    check("body text uses Plus Jakarta Sans", bodyFont.includes("Plus Jakarta Sans"), `got ${bodyFont}`);
     check("paste button offered on the key field", await page.locator("#gate-paste").isVisible());
 
+    section("Video seal and mascot");
+    await page.waitForFunction(() => {
+      const video = document.getElementById("seal-video");
+      return video && video.readyState >= 2 && !video.paused && video.currentTime > 0.2;
+    }, { timeout: 10000 });
+    const sealVideo = await page.locator("#seal-video").evaluate((video) => ({
+      muted: video.muted,
+      loop: video.loop,
+      src: video.currentSrc,
+      width: video.videoWidth,
+      radius: getComputedStyle(video.parentElement).borderRadius,
+    }));
+    check("seal video plays in the circle", sealVideo.width > 0, JSON.stringify(sealVideo));
+    check("seal video is muted and loops", sealVideo.muted && sealVideo.loop);
+    check("seal video is self-hosted", new URL(sealVideo.src).host === new URL(BASE).host, sealVideo.src);
+    check("seal is clipped to a circle", sealVideo.radius === "50%", sealVideo.radius);
+
+    const halo = await page.locator(".seal__halo").evaluate((node) => getComputedStyle(node).backgroundImage);
+    check("seal has a side gradient halo", (halo.match(/radial-gradient/g) ?? []).length >= 2, halo.slice(0, 80));
+
+    check("mascot starts idle", (await page.locator("#mascot").getAttribute("data-mood")) === "idle");
+    const mascotLoaded = await page.locator(".mascot__img--idle").evaluate((img) => img.complete && img.naturalWidth > 0);
+    check("mascot image loaded", mascotLoaded);
+
+    section("Wrong key reaction");
     await page.fill("#key-input", "GP-definitely-wrong-key");
     await page.click("#gate-submit");
     await page.waitForSelector("#gate-error:not([hidden])", { timeout: 8000 });
     check("wrong key shows an inline error", (await page.locator("#gate-error").textContent()).length > 5);
     check("still on the gate after a wrong key", page.url().endsWith("/"));
+    check("mascot reacts sadly to a wrong key", (await page.locator("#mascot").getAttribute("data-mood")) === "sad");
+    check("seal shakes on a wrong key", await page.locator("#gate-seal").evaluate((node) => node.classList.contains("is-denied")));
+    await page.waitForFunction(() => document.getElementById("mascot").dataset.mood === "idle", { timeout: 5000 });
+    check("mascot recovers to idle", true);
 
+    section("Unlock animation");
     await page.fill("#key-input", keyDoc.key);
+    const unlockStarted = Date.now();
     await page.click("#gate-submit");
+    await page.waitForSelector("#gate-seal.is-unlocking", { timeout: 6000 });
+    check("ring sweep starts on a correct key", true);
+    check("key field turns valid", await page.locator("#gate-field").evaluate((node) => node.classList.contains("is-valid")));
+    check("button reads Unlocked", (await page.locator("#gate-submit-label").textContent()) === "Unlocked");
+    check("mascot celebrates", (await page.locator("#mascot").getAttribute("data-mood")) === "happy");
+
+    await page.waitForSelector("#gate-seal.is-unlocked", { timeout: 4000 });
+    const sparks = await page.locator("#seal-burst .spark").count();
+    check("spark burst fires", sparks >= 24, `got ${sparks}`);
+
+    await page.waitForSelector("#iris.is-open", { timeout: 4000 });
+    check("iris wipe opens from the seal", true);
+
     await page.waitForURL("**/watch", { timeout: 10000 });
+    const unlockMs = Date.now() - unlockStarted;
     check("correct key opens the library", page.url().includes("/watch"));
+    check("unlock sequence finishes in about two seconds", unlockMs >= 1500 && unlockMs < 6000, `${unlockMs} ms`);
+    check("watch page plays the arrival transition", (await page.evaluate(() => document.documentElement.getAttribute("data-arrival"))) === "on");
 
     section("Home view");
     await page.waitForSelector(".acard", { timeout: 10000 });
@@ -495,6 +577,7 @@ async function main() {
     await page.bringToFront();
     await page.waitForURL((url) => !url.pathname.startsWith("/watch"), { timeout: 40000 });
     check("expired viewer is thrown back to the gate", !page.url().includes("/watch"), `at ${page.url()}`);
+    check("splash does not repeat on a later visit", await page.locator("#splash").isHidden());
     await page.waitForSelector("#gate-reason:not([hidden])", { timeout: 6000 });
     check("the gate explains why the viewer was signed out", (await page.locator("#gate-reason").textContent()).includes("session has ended"));
     check("the reason is removed from the address bar", !page.url().includes("reason="), page.url());

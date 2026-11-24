@@ -1,27 +1,75 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-splash-page>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#09070c" />
     <title>Get Pleasure — Members Entry</title>
-    <link rel="preload" href="/fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <script src="/js/boot.js"></script>
+    <link rel="preload" href="/img/splash-banner.webp" as="image" type="image/webp" fetchpriority="high" />
+    <link rel="preload" href="/fonts/plus-jakarta-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/bodoni-moda-italic-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/splash.css" />
     <link rel="stylesheet" href="/css/gate.css" />
   </head>
   <body class="gate-body">
+    <div class="splash" id="splash" role="status" aria-live="polite" aria-label="Loading your experience">
+      <div class="splash__frame">
+        <img class="splash__banner" src="/img/splash-banner.webp" alt="" width="735" height="417" decoding="async" />
+        <span class="splash__scan" aria-hidden="true"></span>
+        <span class="splash__glare" aria-hidden="true"></span>
+      </div>
+      <p class="splash__title">Wait, <em>loading your experience</em></p>
+      <div class="splash__bar" aria-hidden="true"><span class="splash__fill" id="splash-fill"></span></div>
+      <p class="splash__meta">
+        <span id="splash-step">Warming up the archive</span>
+        <span class="mono" id="splash-pct">0%</span>
+      </p>
+    </div>
+
+    <div class="iris" id="iris" aria-hidden="true"></div>
+
     <main class="gate">
-      <div class="gate__seal" id="gate-seal" aria-hidden="true">
-        <span class="gate__seal-ring"></span>
-        <span class="gate__seal-core">
-          <svg class="icon gate__lock" viewBox="0 0 24 24" focusable="false">
-            <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
-            <path class="gate__shackle" d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" />
+      <div class="seal" id="gate-seal" aria-hidden="true">
+        <span class="seal__halo"></span>
+        <span class="seal__ring"></span>
+        <div class="seal__disc">
+          <video
+            class="seal__video"
+            id="seal-video"
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="auto"
+            disablepictureinpicture
+            disableremoteplayback
+            poster="/media/seal-poster.webp"
+          >
+            <source src="/media/seal.webm" type="video/webm" />
+            <source src="/media/seal.mp4" type="video/mp4" />
+          </video>
+          <span class="seal__vignette"></span>
+          <svg class="seal__check" viewBox="0 0 52 52" focusable="false">
+            <path d="M14 27.5 22.5 36 39 17" />
           </svg>
-        </span>
+        </div>
+        <svg class="seal__sweep" viewBox="0 0 120 120" focusable="false">
+          <defs>
+            <linearGradient id="sweep-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ff5f8f" />
+              <stop offset="0.55" stop-color="#ffae8a" />
+              <stop offset="1" stop-color="#9adaea" />
+            </linearGradient>
+          </defs>
+          <circle cx="60" cy="60" r="57" stroke="url(#sweep-gradient)" />
+        </svg>
+        <span class="seal__wave"></span>
+        <span class="seal__wave"></span>
+        <span class="seal__wave"></span>
+        <div class="seal__burst" id="seal-burst"></div>
       </div>
 
       <header class="gate__head">
@@ -35,45 +83,51 @@
 
       <div class="notice notice--error gate__reason" id="gate-reason" role="alert" hidden></div>
 
-      <form class="gate__form" id="gate-form" autocomplete="off" novalidate>
-        <label class="gate__label" for="key-input">Access key</label>
-        <div class="gate__field">
-          <span class="gate__field-icon" aria-hidden="true">
-            <svg class="icon" viewBox="0 0 24 24" focusable="false">
-              <circle cx="8" cy="15" r="4" />
-              <path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" />
-            </svg>
-          </span>
-          <input
-            class="gate__input"
-            id="key-input"
-            name="key"
-            type="text"
-            inputmode="text"
-            autocapitalize="none"
-            autocorrect="off"
-            spellcheck="false"
-            enterkeyhint="go"
-            placeholder="GP-••••••••••••••••"
-            aria-describedby="gate-error"
-            required
-          />
-          <button class="gate__paste" id="gate-paste" type="button">Paste</button>
+      <div class="gate__card">
+        <div class="mascot" id="mascot" data-mood="idle" aria-hidden="true">
+          <img class="mascot__img mascot__img--idle" src="/img/characters/reze-smile.webp" alt="" width="613" height="716" />
+          <img class="mascot__img mascot__img--sad" src="/img/characters/rize-glasses.webp" alt="" width="388" height="560" />
+          <img class="mascot__img mascot__img--happy" src="/img/characters/reze-cafe.webp" alt="" width="617" height="710" />
         </div>
 
-        <p class="notice notice--error" id="gate-error" role="alert" hidden></p>
+        <form class="gate__form" id="gate-form" autocomplete="off" novalidate>
+          <label class="gate__label" for="key-input">Access key</label>
+          <div class="gate__field" id="gate-field">
+            <span class="gate__field-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                <circle cx="8" cy="15" r="4" />
+                <path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" />
+              </svg>
+            </span>
+            <input
+              class="gate__input"
+              id="key-input"
+              name="key"
+              type="text"
+              inputmode="text"
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck="false"
+              enterkeyhint="go"
+              placeholder="GP-••••••••••••••••"
+              aria-describedby="gate-error"
+              required
+            />
+            <button class="gate__paste" id="gate-paste" type="button">Paste</button>
+          </div>
 
-        <button class="btn btn--primary btn--block gate__submit" id="gate-submit" type="submit">
-          <span id="gate-submit-label">Unlock access</span>
-          <svg class="icon gate__submit-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </button>
+          <p class="notice notice--error" id="gate-error" role="alert" hidden></p>
 
-        <p class="gate__hint">
-          Changed network or lost your key? The owner can unlock it for you.
-        </p>
-      </form>
+          <button class="btn btn--primary btn--block gate__submit" id="gate-submit" type="submit">
+            <span id="gate-submit-label">Unlock access</span>
+            <svg class="icon gate__submit-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
+
+          <p class="gate__hint">Changed network or lost your key? The owner can unlock it for you.</p>
+        </form>
+      </div>
 
       <section class="gate__trust" aria-label="How your access is protected">
         <h2 class="gate__trust-title">Private by design</h2>

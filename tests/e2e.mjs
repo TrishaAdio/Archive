@@ -575,9 +575,8 @@ async function main() {
     }
 
     for (const fontFile of [
-      "bodoni-moda-latin.woff2",
+      "plus-jakarta-sans-latin.woff2",
       "bodoni-moda-italic-latin.woff2",
-      "schibsted-grotesk-latin.woff2",
       "martian-mono-latin.woff2",
     ]) {
       const fontResponse = await fetch(`${BASE}/fonts/${fontFile}`);
@@ -588,12 +587,35 @@ async function main() {
 
     const themeCss = await (await fetch(`${BASE}/css/theme.css`)).text();
     const fontUrls = [...themeCss.matchAll(/url\("(\/fonts\/[^"]+)"\)/g)].map((match) => match[1]);
-    check("theme declares four self-hosted font files", fontUrls.length === 4, `got ${fontUrls.length}`);
+    check("theme declares three self-hosted font files", fontUrls.length === 3, `got ${fontUrls.length}`);
     for (const url of fontUrls) {
       check(`font referenced in css exists: ${url}`, (await fetch(BASE + url)).status === 200);
     }
     check("no external font host referenced", !/fonts\.googleapis|fonts\.gstatic|use\.typekit/i.test(themeCss));
     check("reduced-motion preference respected", themeCss.includes("prefers-reduced-motion: reduce"));
+
+    for (const [asset, type, maxKb] of [
+      ["/media/seal.webm", "video/webm", 450],
+      ["/media/seal.mp4", "video/mp4", 450],
+      ["/media/seal-poster.webp", "image/webp", 40],
+      ["/img/splash-banner.webp", "image/webp", 60],
+      ["/img/characters/reze-smile.webp", "image/webp", 80],
+      ["/img/characters/reze-cafe.webp", "image/webp", 80],
+      ["/img/characters/rize-glasses.webp", "image/webp", 80],
+      ["/img/characters/rize-lean.webp", "image/webp", 80],
+      ["/img/characters/banner-girl.webp", "image/webp", 80],
+    ]) {
+      const response = await fetch(BASE + asset);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      check(`${asset} is served as ${type}`, response.status === 200 && String(response.headers.get("content-type")).startsWith(type), `got ${response.status} ${response.headers.get("content-type")}`);
+      check(`${asset} stays under ${maxKb} KB for mobile`, bytes.length < maxKb * 1024, `got ${Math.round(bytes.length / 1024)} KB`);
+    }
+
+    const ranged = await fetch(`${BASE}/media/seal.mp4`, { headers: { range: "bytes=0-1023" } });
+    check("seal video supports range requests for iOS Safari", ranged.status === 206, `got ${ranged.status}`);
+
+    const characterWebp = Buffer.from(await (await fetch(`${BASE}/img/characters/reze-smile.webp`)).arrayBuffer());
+    check("character cutouts keep an alpha channel", characterWebp.subarray(0, 4).toString() === "RIFF" && characterWebp.includes(Buffer.from("ALPH")));
 
     const watchPage = await fetch(`${BASE}/watch`);
     const watchHtml = await watchPage.text();
