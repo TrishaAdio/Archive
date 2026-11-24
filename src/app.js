@@ -100,10 +100,11 @@ function createApp({ config, db, collections }) {
     express.static(publicDir, {
       index: false,
       etag: true,
-      maxAge: "1h",
+      lastModified: true,
       setHeaders: (res, filePath) => {
         if (filePath.endsWith(".woff2")) res.set("Cache-Control", "public, max-age=31536000, immutable");
-        if (filePath.endsWith(".html")) res.set("Cache-Control", "no-store");
+        else if (filePath.endsWith(".html")) res.set("Cache-Control", "no-store");
+        else res.set("Cache-Control", "no-cache");
       },
     }),
   );
