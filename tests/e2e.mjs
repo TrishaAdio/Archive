@@ -404,6 +404,27 @@ async function main() {
       placeholder.text === (await viewer.get(`/api/thumb/${withoutThumb.id}`)).text,
     );
 
+    section("Archive search and covers");
+    const byNumber = await viewer.get(`/api/archives/${archiveId}/videos?q=${encodeURIComponent("#4")}`);
+    check("search by #number returns exactly that video", byNumber.json?.videos?.length === 1 && byNumber.json.videos[0].number === 4, `got ${byNumber.text}`);
+
+    const bareNumber = await viewer.get(`/api/archives/${archiveId}/videos?q=5`);
+    check("a bare number also jumps to that video", bareNumber.json?.videos?.[0]?.number === 5, `got ${bareNumber.json?.videos?.[0]?.number}`);
+
+    const byTitle = await viewer.get(`/api/archives/${archiveId}/videos?q=EPISODE`);
+    check("title search is case-insensitive", byTitle.json?.total === 5, `got ${byTitle.json?.total}`);
+
+    const regexAttack = await viewer.get(`/api/archives/${archiveId}/videos?q=${encodeURIComponent("(.*)+$")}`);
+    check("regex characters in search are treated literally", regexAttack.status === 200 && regexAttack.json?.total === 0, `got ${regexAttack.status} ${regexAttack.json?.total}`);
+
+    const missing = await viewer.get(`/api/archives/${archiveId}/videos?q=${encodeURIComponent("#9999")}`);
+    check("a number that does not exist returns nothing", missing.json?.total === 0);
+
+    const homeCovers = await viewer.get("/api/home");
+    const coverIds = homeCovers.json?.archives?.find((item) => item.id === archiveId)?.coverVideoIds ?? [];
+    check("home archives carry up to three cover thumbnails", coverIds.length === 3, `got ${coverIds.length}`);
+    check("home viewer includes the plan start date", Boolean(homeCovers.json?.viewer?.planStartsAt));
+
     section("Resume, likes and view counts");
     const saveProgress = await viewer.post(`/api/videos/${playable.id}/progress`, {
       positionSeconds: 312,
@@ -553,10 +574,26 @@ async function main() {
       check(`asset ${asset} loads`, response.status === 200, `got ${response.status}`);
     }
 
-    const fontResponse = await fetch(`${BASE}/fonts/bricolage-grotesque-latin.woff2`);
-    const fontBytes = Buffer.from(await fontResponse.arrayBuffer());
-    check("display font is a real woff2 file", fontBytes.subarray(0, 4).toString("ascii") === "wOF2");
-    check("font cached immutably", String(fontResponse.headers.get("cache-control")).includes("immutable"));
+    for (const fontFile of [
+      "bodoni-moda-latin.woff2",
+      "bodoni-moda-italic-latin.woff2",
+      "schibsted-grotesk-latin.woff2",
+      "martian-mono-latin.woff2",
+    ]) {
+      const fontResponse = await fetch(`${BASE}/fonts/${fontFile}`);
+      const fontBytes = Buffer.from(await fontResponse.arrayBuffer());
+      check(`${fontFile} is a real woff2 file`, fontBytes.subarray(0, 4).toString("ascii") === "wOF2");
+      check(`${fontFile} cached immutably`, String(fontResponse.headers.get("cache-control")).includes("immutable"));
+    }
+
+    const themeCss = await (await fetch(`${BASE}/css/theme.css`)).text();
+    const fontUrls = [...themeCss.matchAll(/url\("(\/fonts\/[^"]+)"\)/g)].map((match) => match[1]);
+    check("theme declares four self-hosted font files", fontUrls.length === 4, `got ${fontUrls.length}`);
+    for (const url of fontUrls) {
+      check(`font referenced in css exists: ${url}`, (await fetch(BASE + url)).status === 200);
+    }
+    check("no external font host referenced", !/fonts\.googleapis|fonts\.gstatic|use\.typekit/i.test(themeCss));
+    check("reduced-motion preference respected", themeCss.includes("prefers-reduced-motion: reduce"));
 
     const watchPage = await fetch(`${BASE}/watch`);
     const watchHtml = await watchPage.text();

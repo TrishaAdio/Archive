@@ -4,20 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#07070a" />
+    <meta name="theme-color" content="#09070c" />
+    <meta name="view-transition" content="same-origin" />
     <title>Get Pleasure</title>
+    <link rel="preload" href="/fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/css/theme.css" />
     <link rel="stylesheet" href="/css/app.css" />
   </head>
   <body class="app-body">
     <header class="topbar">
-      <button class="topbar__back" id="nav-back" type="button" aria-label="Go back" hidden>
-        <span aria-hidden="true">‹</span>
+      <button class="icon-btn topbar__back" id="nav-back" type="button" aria-label="Go back" hidden>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19 12H5M11 6l-6 6 6 6" />
+        </svg>
       </button>
-      <a class="topbar__brand wordmark" href="/watch">Get&nbsp;Pleasure</a>
+      <a class="topbar__brand wordmark" href="/watch">Get <em>Pleasure</em></a>
       <div class="topbar__meta">
         <span class="pill" id="plan-pill" hidden></span>
-        <button class="topbar__menu" id="menu-toggle" type="button" aria-label="Account menu">
+        <button class="icon-btn" id="menu-toggle" type="button" aria-label="Your access" aria-haspopup="dialog">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
             <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
@@ -27,85 +32,132 @@
       </div>
     </header>
 
-    <div class="sheet" id="account-sheet" hidden>
-      <div class="sheet__panel">
-        <h2 class="sheet__title">Your access</h2>
-        <dl class="sheet__list">
-          <div class="sheet__row"><dt>Key</dt><dd class="mono" id="account-key">—</dd></div>
-          <div class="sheet__row"><dt>Tier</dt><dd id="account-tier">—</dd></div>
-          <div class="sheet__row"><dt>Locked to IP</dt><dd class="mono" id="account-ip">—</dd></div>
-          <div class="sheet__row"><dt>Plan ends</dt><dd id="account-expiry">—</dd></div>
-        </dl>
-        <button class="btn btn--ghost btn--block" id="sheet-close" type="button">Close</button>
-        <button class="btn btn--danger btn--block" id="logout-button" type="button">Sign out</button>
-      </div>
-    </div>
-
     <main class="main" id="main">
       <section class="view" id="view-home" data-view="home">
         <div class="hero">
-          <p class="hero__eyebrow" id="hero-eyebrow">Your tier</p>
-          <h1 class="hero__title" id="hero-title">Loading…</h1>
+          <p class="eyebrow" id="hero-eyebrow">Your tier</p>
+          <p class="hero__greeting" id="hero-greeting"></p>
+          <h1 class="hero__title" id="hero-title">Loading</h1>
           <p class="hero__sub" id="hero-sub"></p>
+          <div class="hero__chips" id="hero-chips"></div>
         </div>
 
-        <div id="resume-section" hidden>
+        <div class="block" id="resume-section" hidden>
           <div class="section-head">
-            <h2 class="section-head__title">Pick up where you left off</h2>
+            <h2 class="section-head__title">Pick up <em>where you left off</em></h2>
           </div>
           <div class="rail" id="resume-rail"></div>
         </div>
 
-        <div class="section-head">
-          <h2 class="section-head__title">Archives</h2>
-          <span class="section-head__count" id="archive-count"></span>
+        <div class="block">
+          <div class="section-head">
+            <h2 class="section-head__title">The <em>archives</em></h2>
+            <span class="section-head__count" id="archive-count"></span>
+          </div>
+          <div class="archive-grid" id="archive-grid"></div>
+          <div class="empty" id="archive-empty" hidden>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m12 3 9 5-9 5-9-5z" />
+              <path d="m3 13 9 5 9-5" />
+            </svg>
+            Nothing has been published for your tier yet. Check back soon.
+          </div>
         </div>
-        <div class="archive-grid" id="archive-grid"></div>
-        <p class="empty" id="archive-empty" hidden>
-          No archives have been published for your tier yet. Check back soon.
+
+        <p class="footnote">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+          Session locked to your network · Links expire in minutes
         </p>
       </section>
 
       <section class="view" id="view-archive" data-view="archive" hidden>
         <div class="archive-head">
+          <p class="eyebrow">Archive</p>
           <h1 class="archive-head__title" id="archive-title">Archive</h1>
           <p class="archive-head__sub" id="archive-sub"></p>
         </div>
 
-        <div class="sorts" role="tablist" aria-label="Sort videos">
-          <button class="sort is-active" data-sort="popular" role="tab" type="button">Most watched</button>
-          <button class="sort" data-sort="liked" role="tab" type="button">Most liked</button>
-          <button class="sort" data-sort="number" role="tab" type="button">By number</button>
-          <button class="sort" data-sort="newest" role="tab" type="button">Newest</button>
+        <div class="toolbar">
+          <label class="search" for="video-search">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m20 20-4.2-4.2" />
+            </svg>
+            <span class="sr-only">Search this archive</span>
+            <input
+              class="search__input"
+              id="video-search"
+              type="search"
+              placeholder="Search a title or jump to #42"
+              autocomplete="off"
+              enterkeyhint="search"
+            />
+            <button class="search__clear" id="video-search-clear" type="button" aria-label="Clear search" hidden>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </label>
+
+          <div class="segmented" id="sort-control" role="tablist" aria-label="Sort videos">
+            <span class="segmented__indicator" aria-hidden="true"></span>
+            <button class="segmented__item sort is-active" data-sort="popular" role="tab" type="button">Most watched</button>
+            <button class="segmented__item sort" data-sort="liked" role="tab" type="button">Most liked</button>
+            <button class="segmented__item sort" data-sort="number" role="tab" type="button">By number</button>
+            <button class="segmented__item sort" data-sort="newest" role="tab" type="button">Newest</button>
+          </div>
         </div>
 
         <div class="video-grid" id="video-grid"></div>
         <div class="loadmore">
-          <button class="btn btn--ghost" id="load-more" type="button" hidden>Load more</button>
+          <span class="loadmore__sentinel" id="load-sentinel" aria-hidden="true"></span>
+          <button class="btn btn--ghost btn--sm" id="load-more" type="button" hidden>Load more</button>
           <p class="loadmore__status" id="video-status"></p>
         </div>
       </section>
 
       <section class="view" id="view-player" data-view="player" hidden>
         <div class="player">
-          <div class="player__stage" id="player-stage">
-            <video
-              class="player__video"
-              id="player-video"
-              playsinline
-              controls
-              preload="auto"
-              controlslist="nodownload noremoteplayback"
-              disablepictureinpicture
-            ></video>
-            <div class="player__watermark" id="player-watermark" aria-hidden="true"></div>
-            <div class="player__spinner" id="player-spinner"><div class="spinner"></div></div>
+          <div class="player__frame">
+            <img class="player__ambient" id="player-ambient" alt="" aria-hidden="true" />
+            <div class="player__stage" id="player-stage">
+              <video
+                class="player__video"
+                id="player-video"
+                playsinline
+                controls
+                preload="auto"
+                controlslist="nodownload noremoteplayback"
+                disablepictureinpicture
+              ></video>
+              <div class="player__watermark" id="player-watermark" aria-hidden="true"></div>
+              <div class="player__spinner" id="player-spinner"><div class="spinner"></div></div>
+              <div class="player__chip" id="player-resume" role="status" hidden></div>
+
+              <div class="upnext" id="upnext-overlay" hidden>
+                <p class="eyebrow">Up next in <span id="upnext-seconds">6</span></p>
+                <h3 class="upnext__title" id="upnext-title"></h3>
+                <div class="upnext__actions">
+                  <button class="btn btn--primary btn--sm" id="upnext-play" type="button">
+                    <svg class="icon icon--solid" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M8 5.2 19 12 8 18.8z" />
+                    </svg>
+                    Play now
+                  </button>
+                  <button class="btn btn--ghost btn--sm" id="upnext-cancel" type="button">Stay here</button>
+                </div>
+                <span class="upnext__bar"><span class="upnext__bar-fill" id="upnext-bar"></span></span>
+              </div>
+            </div>
           </div>
 
           <div class="player__info">
             <div class="player__heading">
               <span class="player__number" id="player-number">#0</span>
-              <h1 class="player__title" id="player-title">—</h1>
+              <h1 class="player__title" id="player-title">Loading</h1>
             </div>
             <p class="player__meta" id="player-meta"></p>
 
@@ -115,25 +167,36 @@
                   <svg class="icon icon--solid" viewBox="0 0 24 24" focusable="false">
                     <path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z" />
                   </svg>
+                  <span class="like__burst"></span>
                 </span>
                 <span class="like__count" id="like-count">0</span>
                 <span class="sr-only">Like this video</span>
               </button>
               <button class="btn btn--ghost btn--sm" id="back-to-archive" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+                  <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+                  <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+                  <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+                </svg>
                 Back to archive
               </button>
             </div>
 
             <p class="notice notice--error" id="player-error" role="alert" hidden></p>
             <p class="player__guard">
-              Playback is signed for your session and expires quickly. Saving or re-sharing the
-              stream is not permitted.
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="13.5" r="7.5" />
+                <path d="M12 9.5v4l2.5 1.5M9.5 2.5h5" />
+              </svg>
+              This stream is signed to your session and expires in minutes. Saving or sharing it is
+              not permitted.
             </p>
           </div>
 
-          <div id="upnext-section" hidden>
+          <div class="block" id="upnext-section" hidden>
             <div class="section-head">
-              <h2 class="section-head__title">Up next</h2>
+              <h2 class="section-head__title">Up <em>next</em></h2>
             </div>
             <div class="rail" id="upnext-rail"></div>
           </div>
@@ -141,11 +204,59 @@
       </section>
     </main>
 
-    <div class="modal" id="broadcast-modal" role="alertdialog" aria-modal="true" aria-labelledby="broadcast-title" hidden>
-      <div class="modal__panel">
-        <p class="modal__eyebrow">Message from the owner</p>
-        <h2 class="modal__title" id="broadcast-title">Announcement</h2>
-        <p class="modal__body" id="broadcast-message"></p>
+    <div class="scrim" id="account-sheet" role="dialog" aria-modal="true" aria-labelledby="account-title" hidden>
+      <div class="sheet-panel account">
+        <p class="eyebrow">Your access</p>
+        <h2 class="sheet-title" id="account-title">Membership</h2>
+
+        <div class="plan">
+          <svg class="plan__ring" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <linearGradient id="plan-gradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ff5f8f" />
+                <stop offset="0.6" stop-color="#ffae8a" />
+                <stop offset="1" stop-color="#f0cf9e" />
+              </linearGradient>
+            </defs>
+            <circle class="plan__track" cx="60" cy="60" r="52" />
+            <circle class="plan__progress" id="plan-progress" cx="60" cy="60" r="52" stroke="url(#plan-gradient)" />
+          </svg>
+          <div class="plan__label">
+            <span class="plan__days" id="plan-days">0</span>
+            <span class="plan__unit" id="plan-unit">days left</span>
+          </div>
+        </div>
+
+        <dl class="sheet-list">
+          <div class="sheet-list__row"><dt>Key</dt><dd class="mono" id="account-key">—</dd></div>
+          <div class="sheet-list__row"><dt>Tier</dt><dd id="account-tier">—</dd></div>
+          <div class="sheet-list__row"><dt>Locked to</dt><dd class="mono" id="account-ip">—</dd></div>
+          <div class="sheet-list__row"><dt>Plan ends</dt><dd id="account-expiry">—</dd></div>
+        </dl>
+
+        <div class="sheet-actions">
+          <button class="btn btn--ghost btn--block" id="sheet-close" type="button">Close</button>
+          <button class="btn btn--danger btn--block" id="logout-button" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M14.5 4.5h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-3M10 16.5 5.5 12 10 7.5M5.5 12H15" />
+            </svg>
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scrim" id="broadcast-modal" role="alertdialog" aria-modal="true" aria-labelledby="broadcast-title" hidden>
+      <div class="sheet-panel broadcast">
+        <span class="broadcast__icon" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" focusable="false">
+            <path d="M4 10v4a1.5 1.5 0 0 0 1.5 1.5H7l9 4.5V4L7 8.5H5.5A1.5 1.5 0 0 0 4 10z" />
+            <path d="M19.5 9.5a3.5 3.5 0 0 1 0 5" />
+          </svg>
+        </span>
+        <p class="eyebrow">Message from the owner</p>
+        <h2 class="sheet-title" id="broadcast-title">Announcement</h2>
+        <p class="sheet-body" id="broadcast-message"></p>
         <button class="btn btn--primary btn--block" id="broadcast-ack" type="button">I Read</button>
       </div>
     </div>

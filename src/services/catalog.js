@@ -260,8 +260,38 @@ function createCatalogService({ categories, archives, videos }, { counters, medi
     };
   }
 
-  async function listVideos(archiveId, { sort = "popular", limit = 60, skip = 0 } = {}) {
+  async function coversForArchives(archiveObjectIds, perArchive = 3) {
+    if (archiveObjectIds.length === 0) return new Map();
+
+    const rows = await videos
+      .aggregate([
+        { $match: { archiveId: { $in: archiveObjectIds } } },
+        {
+          $group: {
+            _id: "$archiveId",
+            covers: { $topN: { n: perArchive, sortBy: { viewCount: -1, seq: 1 }, output: "$_id" } },
+          },
+        },
+      ])
+      .toArray();
+
+    return new Map(rows.map((row) => [row._id.toHexString(), row.covers.map((id) => id.toHexString())]));
+  }
+
+  function buildSearchFilter(query) {
+    const text = typeof query === "string" ? query.trim().slice(0, 80) : "";
+    if (!text) return {};
+
+    const numberMatch = /^#?\s*(\d{1,7})$/.exec(text);
+    if (numberMatch) return { seq: Number(numberMatch[1]) };
+
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return { title: { $regex: escaped, $options: "i" } };
+  }
+
+  async function listVideos(archiveId, { sort = "popular", limit = 60, skip = 0, query = "" } = {}) {
     const archive = await getArchive(archiveId);
+    const filter = { archiveId: archive._id, ...buildSearchFilter(query) };
     const sortSpec =
       sort === "number"
         ? { seq: 1 }
@@ -272,8 +302,8 @@ function createCatalogService({ categories, archives, videos }, { counters, medi
             : { viewCount: -1, seq: 1 };
 
     const [docs, total] = await Promise.all([
-      videos.find({ archiveId: archive._id }).sort(sortSpec).skip(skip).limit(Math.min(limit, 200)).toArray(),
-      videos.countDocuments({ archiveId: archive._id }),
+      videos.find(filter).sort(sortSpec).skip(skip).limit(Math.min(limit, 200)).toArray(),
+      videos.countDocuments(filter),
     ]);
 
     return { archive: shapeArchive(archive), total, docs };
@@ -288,6 +318,10 @@ function createCatalogService({ categories, archives, videos }, { counters, medi
   async function findVideosByIds(ids) {
     if (ids.length === 0) return [];
     return videos.find({ _id: { $in: ids.map((id) => toObjectId(id)) } }).toArray();
+  }
+
+  function toArchiveObjectId(id) {
+    return toObjectId(id);
   }
 
   async function resolveVideoFile(video) {
@@ -319,12 +353,14 @@ function createCatalogService({ categories, archives, videos }, { counters, medi
     deleteArchive,
     importIntoArchive,
     listVideos,
+    coversForArchives,
     getVideo,
     findVideosByIds,
     shapeVideo,
     shapeArchive,
     resolveVideoFile,
     resolveThumbFile,
+    toArchiveObjectId,
     totals,
   };
 }

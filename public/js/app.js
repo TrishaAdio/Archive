@@ -10,10 +10,27 @@ import {
   plural,
   revealOnScroll,
 } from "./api.js";
+import {
+  closeScrim,
+  countUp,
+  enableSpotlight,
+  enableTilt,
+  enhanceButtons,
+  greeting,
+  haptic,
+  syncSegmented,
+  toast,
+  trackScroll,
+  watchSegmented,
+  withViewTransition,
+} from "./ui.js";
 import { startPresence } from "./presence.js";
 import { createPlayer } from "./player.js";
 
 const PAGE_SIZE = 24;
+const RING_LENGTH = 326.73;
+const SESSION_ENDING_CODES = ["ip_mismatch", "subscription_expired", "subscription_revoked", "plan_not_started"];
+const SESSION_ENDED_MESSAGE = "Your session has ended. If your plan is still active, enter your key again.";
 
 const views = {
   home: document.getElementById("view-home"),
@@ -24,6 +41,9 @@ const views = {
 const navBack = document.getElementById("nav-back");
 const planPill = document.getElementById("plan-pill");
 const sheet = document.getElementById("account-sheet");
+const sortControl = document.getElementById("sort-control");
+const searchInput = document.getElementById("video-search");
+const searchClear = document.getElementById("video-search-clear");
 
 const state = {
   viewer: null,
@@ -31,9 +51,12 @@ const state = {
   archives: [],
   archive: null,
   sort: "popular",
+  query: "",
   videos: [],
   total: 0,
   loading: false,
+  requestId: 0,
+  currentView: "home",
 };
 
 function leaveToGate(message) {
@@ -42,14 +65,23 @@ function leaveToGate(message) {
 }
 
 function showView(name) {
-  Object.entries(views).forEach(([key, node]) => {
-    node.hidden = key !== name;
-  });
-  navBack.hidden = name === "home";
-  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  const changed = state.currentView !== name;
+  state.currentView = name;
+
+  const apply = () => {
+    Object.entries(views).forEach(([key, node]) => {
+      node.hidden = key !== name;
+    });
+    navBack.hidden = name === "home";
+    if (changed) window.scrollTo({ top: 0, behavior: "instant" });
+    if (name === "archive") syncSegmented(sortControl, { instant: changed });
+  };
+
+  if (changed) withViewTransition(apply);
+  else apply();
 }
 
-function route(push = true) {
+function route() {
   const params = new URLSearchParams(window.location.search);
   const videoId = params.get("v");
   const archiveId = params.get("a");
@@ -70,14 +102,24 @@ function thumbUrl(videoId) {
   return `/api/thumb/${videoId}`;
 }
 
+function markImagesOnLoad(root) {
+  root.querySelectorAll("img[data-fade]:not(.is-loaded)").forEach((img) => {
+    const done = () => img.classList.add("is-loaded");
+    if (img.complete && img.naturalWidth > 0) done();
+    else img.addEventListener("load", done, { once: true });
+  });
+}
+
 function progressBarMarkup(percent) {
   if (!percent) return "";
   return `<span class="thumb__progress"><span class="thumb__progress-fill" data-percent="${percent}"></span></span>`;
 }
 
 function applyProgressWidths(root) {
-  root.querySelectorAll(".thumb__progress-fill[data-percent]").forEach((node) => {
-    node.style.width = `${Math.min(100, Number(node.dataset.percent) || 0)}%`;
+  requestAnimationFrame(() => {
+    root.querySelectorAll(".thumb__progress-fill[data-percent]").forEach((node) => {
+      node.style.width = `${Math.min(100, Number(node.dataset.percent) || 0)}%`;
+    });
   });
 }
 
@@ -89,25 +131,30 @@ function videoCardMarkup(video, { showArchive } = {}) {
       : ""
     : `<span class="thumb__duration thumb__duration--warn">Needs transcode</span>`;
 
+  const likes = video.liked
+    ? `<span class="vcard__liked">${icon("heart", { solid: true })} ${formatCount(video.likeCount)}</span>`
+    : plural(video.likeCount, "like");
+
   return `
-    <article class="vcard reveal" data-video="${video.id}" tabindex="0" role="button">
+    <article class="vcard reveal" data-video="${video.id}" tabindex="0" role="button" aria-label="Play #${video.number} ${escapeHtml(video.title)}">
       <div class="thumb">
-        <img class="thumb__img" src="${thumbUrl(video.id)}" alt="" loading="lazy" decoding="async" />
+        <img class="thumb__img" data-fade src="${thumbUrl(video.id)}" alt="" loading="lazy" decoding="async" />
         <span class="thumb__number">#${video.number}</span>
-        ${badge}
         ${progressBarMarkup(video.progressPercent)}
+        ${badge}
         <span class="thumb__play" aria-hidden="true">${icon("play", { solid: true })}</span>
       </div>
       <h3 class="vcard__title">${escapeHtml(video.title)}</h3>
       <p class="vcard__meta">
-        ${plural(video.viewCount, "view")} · ${plural(video.likeCount, "like")}
+        ${plural(video.viewCount, "view")} · ${likes}
         ${showArchive && video.archiveName ? ` · ${escapeHtml(video.archiveName)}` : ""}
       </p>
     </article>`;
 }
 
-function bindVideoCards(root, handler) {
-  root.querySelectorAll("[data-video]").forEach((node) => {
+function hydrateCards(root, handler) {
+  root.querySelectorAll("[data-video]:not([data-bound])").forEach((node) => {
+    node.dataset.bound = "1";
     const open = () => handler(node.dataset.video);
     node.addEventListener("click", open);
     node.addEventListener("keydown", (event) => {
@@ -117,9 +164,13 @@ function bindVideoCards(root, handler) {
       }
     });
   });
+  markImagesOnLoad(root);
+  applyProgressWidths(root);
+  revealOnScroll(root);
 }
 
 async function openHome({ push = true } = {}) {
+  player.teardown();
   showView("home");
   if (push) pushUrl("");
 
@@ -135,7 +186,7 @@ async function openHome({ push = true } = {}) {
     state.archives = home.archives;
 
     renderPlan(home.viewer, home.category);
-    renderHero(home.category, home.archives);
+    renderHero(home.category, home.archives, home.viewer);
     renderResume(home.continueWatching);
     renderArchives(home.archives);
   } catch (error) {
@@ -144,9 +195,9 @@ async function openHome({ push = true } = {}) {
 }
 
 function renderPlan(viewer, category) {
-  const remaining = daysLeft(viewer.planExpiresAt);
+  const remaining = Math.max(0, daysLeft(viewer.planExpiresAt) ?? 0);
   planPill.hidden = false;
-  planPill.textContent = remaining > 0 ? `${remaining} day${remaining === 1 ? "" : "s"} left` : "Expiring";
+  planPill.textContent = remaining > 0 ? `${remaining} day${remaining === 1 ? "" : "s"} left` : "Ends today";
   planPill.className = `pill ${remaining <= 3 ? "pill--warn" : "pill--ok"}`;
 
   document.getElementById("account-key").textContent = viewer.keyHint;
@@ -155,13 +206,42 @@ function renderPlan(viewer, category) {
   document.getElementById("account-expiry").textContent = formatDate(viewer.planExpiresAt);
 }
 
-function renderHero(category, archives) {
+function renderPlanRing() {
+  const viewer = state.viewer;
+  if (!viewer) return;
+
+  const start = new Date(viewer.planStartsAt ?? Date.now()).getTime();
+  const end = new Date(viewer.planExpiresAt).getTime();
+  const span = Math.max(1, end - start);
+  const fraction = Math.min(1, Math.max(0, (end - Date.now()) / span));
+  const remaining = Math.max(0, daysLeft(viewer.planExpiresAt) ?? 0);
+
+  const progress = document.getElementById("plan-progress");
+  progress.style.setProperty("--plan-offset", String(RING_LENGTH));
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => progress.style.setProperty("--plan-offset", String(RING_LENGTH * (1 - fraction)))),
+  );
+
+  document.getElementById("plan-days").dataset.value = "0";
+  countUp(document.getElementById("plan-days"), remaining, { duration: 1200 });
+  document.getElementById("plan-unit").textContent = remaining === 1 ? "day left" : "days left";
+}
+
+function renderHero(category, archives, viewer) {
   const videoTotal = archives.reduce((sum, archive) => sum + archive.videoCount, 0);
-  document.getElementById("hero-eyebrow").textContent = `Tier ${category.code}`;
+  const remaining = Math.max(0, daysLeft(viewer.planExpiresAt) ?? 0);
+
+  document.getElementById("hero-eyebrow").textContent = `Tier ${category.code} · Members`;
+  document.getElementById("hero-greeting").textContent = `${greeting()}, welcome back`;
   document.getElementById("hero-title").textContent = category.name ?? `Category ${category.code}`;
   document.getElementById("hero-sub").textContent = archives.length
-    ? `${archives.length} archive${archives.length === 1 ? "" : "s"} · ${videoTotal} video${videoTotal === 1 ? "" : "s"} available to you`
-    : "";
+    ? `${plural(archives.length, "archive")} and ${plural(videoTotal, "video")} curated for your tier.`
+    : "Your collection is being prepared.";
+
+  document.getElementById("hero-chips").innerHTML = `
+    <span class="chip">${icon("layers")}<strong>${formatCount(videoTotal)}</strong> videos</span>
+    <span class="chip">${icon("calendar")}<strong>${remaining}</strong> ${remaining === 1 ? "day" : "days"} left</span>
+    <span class="chip">${icon("lock")} Network-locked</span>`;
 }
 
 function renderResume(items) {
@@ -175,9 +255,18 @@ function renderResume(items) {
 
   section.hidden = false;
   rail.innerHTML = items.map((video) => videoCardMarkup(video, { showArchive: true })).join("");
-  applyProgressWidths(rail);
-  bindVideoCards(rail, (id) => openPlayer(id));
-  revealOnScroll(rail);
+  hydrateCards(rail, (id) => openPlayer(id));
+}
+
+function coverMarkup(archive) {
+  const covers = archive.coverVideoIds ?? [];
+  const cells = covers.length
+    ? covers
+        .map((id) => `<span class="acard__cover"><img data-fade src="${thumbUrl(id)}" alt="" loading="lazy" decoding="async" /></span>`)
+        .join("")
+    : '<span class="acard__cover"></span>';
+
+  return `<div class="acard__covers acard__covers--${Math.max(1, covers.length)}">${cells}</div>`;
 }
 
 function renderArchives(archives) {
@@ -185,21 +274,22 @@ function renderArchives(archives) {
   const empty = document.getElementById("archive-empty");
   const count = document.getElementById("archive-count");
 
-  count.textContent = archives.length ? `${archives.length}` : "";
+  count.textContent = archives.length ? String(archives.length).padStart(2, "0") : "";
   empty.hidden = archives.length > 0;
 
   grid.innerHTML = archives
     .map(
       (archive) => `
-      <article class="acard reveal" data-archive="${archive.id}">
+      <article class="acard spotlight reveal" data-archive="${archive.id}" data-tilt>
+        ${coverMarkup(archive)}
+        <span class="pill acard__count">${plural(archive.videoCount, "video")}</span>
         <div class="acard__body">
           <h3 class="acard__title">${escapeHtml(archive.name)}</h3>
-          <p class="acard__meta">${archive.videoCount} video${archive.videoCount === 1 ? "" : "s"}</p>
           ${archive.description ? `<p class="acard__desc">${escapeHtml(archive.description)}</p>` : ""}
+          <button class="btn btn--primary acard__cta" type="button" data-start="${archive.id}">
+            Start Watching ${icon("arrowRight")}
+          </button>
         </div>
-        <button class="btn btn--primary acard__cta" type="button" data-start="${archive.id}">
-          Start Watching
-        </button>
       </article>`,
     )
     .join("");
@@ -207,24 +297,43 @@ function renderArchives(archives) {
   grid.querySelectorAll("[data-start]").forEach((node) => {
     node.addEventListener("click", (event) => {
       event.stopPropagation();
-      openArchive(node.dataset.start);
+      haptic(10);
+      openArchive(node.dataset.start, { query: "" });
     });
   });
 
+  markImagesOnLoad(grid);
+  enhanceButtons(grid);
+  enableSpotlight(grid);
+  enableTilt(grid);
   revealOnScroll(grid);
 }
 
-async function openArchive(archiveId, { push = true, sort } = {}) {
+async function openArchive(archiveId, { push = true, sort, query } = {}) {
+  player.teardown();
   showView("archive");
   if (push) pushUrl(`a=${encodeURIComponent(archiveId)}`);
+
+  if (state.archive !== archiveId) {
+    state.query = "";
+    searchInput.value = "";
+  }
+  if (query !== undefined) {
+    state.query = query;
+    searchInput.value = query;
+  }
+  searchClear.hidden = !state.query;
 
   state.archive = archiveId;
   state.sort = sort ?? state.sort;
   state.videos = [];
 
-  document.querySelectorAll(".sort").forEach((node) => {
-    node.classList.toggle("is-active", node.dataset.sort === state.sort);
+  sortControl.querySelectorAll(".sort").forEach((node) => {
+    const active = node.dataset.sort === state.sort;
+    node.classList.toggle("is-active", active);
+    node.setAttribute("aria-selected", String(active));
   });
+  syncSegmented(sortControl);
 
   const grid = document.getElementById("video-grid");
   grid.innerHTML = Array.from({ length: 6 }, () => '<div class="skeleton video-skeleton"></div>').join("");
@@ -233,8 +342,9 @@ async function openArchive(archiveId, { push = true, sort } = {}) {
 }
 
 async function loadVideoPage({ replace = false } = {}) {
-  if (state.loading) return;
+  if (state.loading && !replace) return;
   state.loading = true;
+  const requestId = ++state.requestId;
 
   const grid = document.getElementById("video-grid");
   const status = document.getElementById("video-status");
@@ -242,33 +352,38 @@ async function loadVideoPage({ replace = false } = {}) {
 
   try {
     const skip = replace ? 0 : state.videos.length;
-    const page = await api.get(
-      `/api/archives/${state.archive}/videos?sort=${state.sort}&skip=${skip}&limit=${PAGE_SIZE}`,
-    );
+    const params = new URLSearchParams({ sort: state.sort, skip: String(skip), limit: String(PAGE_SIZE) });
+    if (state.query) params.set("q", state.query);
+
+    const page = await api.get(`/api/archives/${state.archive}/videos?${params}`);
+    if (requestId !== state.requestId) return;
 
     state.total = page.total;
     state.videos = replace ? page.videos : [...state.videos, ...page.videos];
 
     document.getElementById("archive-title").textContent = page.archive.name;
-    document.getElementById("archive-sub").textContent = `${page.total} video${page.total === 1 ? "" : "s"} in this archive`;
+    document.getElementById("archive-sub").textContent = state.query
+      ? `${plural(page.total, "result")} for “${state.query}”`
+      : `${plural(page.total, "video")}, numbered #1 to #${page.total || 0}`;
 
     if (replace) grid.innerHTML = "";
+
     if (state.videos.length === 0) {
-      grid.innerHTML = '<p class="empty">This archive has no videos yet.</p>';
+      grid.innerHTML = state.query
+        ? `<div class="empty">${icon("search")}No video matches “${escapeHtml(state.query)}”.</div>`
+        : `<div class="empty">${icon("film")}This archive has no videos yet.</div>`;
     } else {
       grid.insertAdjacentHTML("beforeend", page.videos.map((video) => videoCardMarkup(video)).join(""));
-      applyProgressWidths(grid);
-      bindVideoCards(grid, (id) => openPlayer(id));
-      revealOnScroll(grid);
+      hydrateCards(grid, (id) => openPlayer(id));
     }
 
     const remaining = state.total - state.videos.length;
     loadMore.hidden = remaining <= 0;
-    status.textContent = state.total ? `Showing ${state.videos.length} of ${state.total}` : "";
+    status.textContent = state.total ? `${state.videos.length} of ${state.total}` : "";
   } catch (error) {
     handleAuthError(error);
   } finally {
-    state.loading = false;
+    if (requestId === state.requestId) state.loading = false;
   }
 }
 
@@ -279,19 +394,66 @@ const player = createPlayer({
     box.hidden = !message;
   },
   onAuthError: handleAuthError,
+  onEnded: () => startUpNext(),
+  onUserResume: () => cancelUpNext(),
 });
 
+const upNext = { timer: null, video: null };
+
+function startUpNext() {
+  const next = upNext.video;
+  if (!next) return;
+
+  const overlay = document.getElementById("upnext-overlay");
+  const seconds = document.getElementById("upnext-seconds");
+  const bar = document.getElementById("upnext-bar");
+  const durationMs = 6000;
+
+  document.getElementById("upnext-title").textContent = `#${next.number} ${next.title}`;
+  bar.style.setProperty("--upnext-ms", `${durationMs}ms`);
+  bar.style.animation = "none";
+  void bar.offsetWidth;
+  bar.style.animation = "";
+  overlay.hidden = false;
+
+  let left = Math.round(durationMs / 1000);
+  seconds.textContent = String(left);
+  clearInterval(upNext.timer);
+  upNext.timer = setInterval(() => {
+    left -= 1;
+    seconds.textContent = String(Math.max(0, left));
+    if (left <= 0) {
+      cancelUpNext();
+      openPlayer(next.id);
+    }
+  }, 1000);
+}
+
+function cancelUpNext() {
+  clearInterval(upNext.timer);
+  upNext.timer = null;
+  document.getElementById("upnext-overlay").hidden = true;
+}
+
 async function openPlayer(videoId, { push = true } = {}) {
+  cancelUpNext();
   showView("player");
   if (push) pushUrl(`v=${encodeURIComponent(videoId)}`);
 
   document.getElementById("player-error").hidden = true;
+  const ambient = document.getElementById("player-ambient");
+  ambient.classList.remove("is-loaded");
+  ambient.onload = () => ambient.classList.add("is-loaded");
+  ambient.src = thumbUrl(videoId);
 
   try {
     const video = await api.get(`/api/videos/${videoId}`);
+    state.archive = video.archiveId;
 
     document.getElementById("player-number").textContent = `#${video.number}`;
     document.getElementById("player-title").textContent = video.title;
+    document.title = `#${video.number} ${video.title} — Get Pleasure`;
+
     const renderMeta = (viewCount) => {
       document.getElementById("player-meta").textContent = [
         plural(viewCount, "view"),
@@ -324,7 +486,13 @@ function renderLike(video) {
 
   button.onclick = async () => {
     button.disabled = true;
+    const optimistic = !video.liked;
+    button.classList.toggle("is-liked", optimistic);
+    button.classList.remove("is-popping");
+    void button.offsetWidth;
     button.classList.add("is-popping");
+    if (optimistic) haptic([8, 30, 14]);
+
     try {
       const result = await api.post(`/api/videos/${video.id}/like`);
       video.liked = result.liked;
@@ -333,10 +501,11 @@ function renderLike(video) {
       button.classList.toggle("is-liked", result.liked);
       button.setAttribute("aria-pressed", String(result.liked));
     } catch (error) {
+      button.classList.toggle("is-liked", Boolean(video.liked));
       handleAuthError(error);
     } finally {
       button.disabled = false;
-      setTimeout(() => button.classList.remove("is-popping"), 420);
+      setTimeout(() => button.classList.remove("is-popping"), 650);
     }
   };
 }
@@ -344,10 +513,16 @@ function renderLike(video) {
 async function loadUpNext(video) {
   const section = document.getElementById("upnext-section");
   const rail = document.getElementById("upnext-rail");
+  upNext.video = null;
 
   try {
-    const page = await api.get(`/api/archives/${video.archiveId}/videos?sort=popular&limit=12`);
-    const others = page.videos.filter((item) => item.id !== video.id).slice(0, 10);
+    const [popular, ordered] = await Promise.all([
+      api.get(`/api/archives/${video.archiveId}/videos?sort=popular&limit=12`),
+      api.get(`/api/archives/${video.archiveId}/videos?sort=number&skip=${Math.max(0, video.number)}&limit=1`),
+    ]);
+
+    const others = popular.videos.filter((item) => item.id !== video.id).slice(0, 10);
+    upNext.video = ordered.videos.find((item) => item.playable && item.id !== video.id) ?? others.find((item) => item.playable) ?? null;
 
     if (!others.length) {
       section.hidden = true;
@@ -356,9 +531,7 @@ async function loadUpNext(video) {
 
     section.hidden = false;
     rail.innerHTML = others.map((item) => videoCardMarkup(item)).join("");
-    applyProgressWidths(rail);
-    bindVideoCards(rail, (id) => openPlayer(id));
-    revealOnScroll(rail);
+    hydrateCards(rail, (id) => openPlayer(id));
   } catch {
     section.hidden = true;
   }
@@ -370,56 +543,127 @@ function handleAuthError(error) {
     return;
   }
 
-  if (error.status === 401) return leaveToGate();
-  if (error.status === 403) {
-    if (["ip_mismatch", "subscription_expired", "subscription_revoked", "plan_not_started"].includes(error.code)) {
-      return leaveToGate(error.message);
-    }
-  }
+  if (error.status === 401) return leaveToGate(state.viewer ? SESSION_ENDED_MESSAGE : undefined);
+  if (error.status === 403 && SESSION_ENDING_CODES.includes(error.code)) return leaveToGate(error.message);
 
   const box = document.getElementById("player-error");
   if (box && !views.player.hidden) {
     box.textContent = error.message;
     box.hidden = false;
   } else {
-    console.warn(error.message);
+    toast(error.message, { tone: "error" });
   }
 }
+
+async function openSheet() {
+  sheet.hidden = false;
+  renderPlanRing();
+  enhanceButtons(sheet);
+  document.getElementById("sheet-close").focus();
+}
+
+async function closeSheet() {
+  if (sheet.hidden) return;
+  await closeScrim(sheet);
+}
+
+function debounce(fn, delay) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+const runSearch = debounce(() => {
+  const value = searchInput.value.trim();
+  if (value === state.query) return;
+  state.query = value;
+  searchClear.hidden = !value;
+  state.videos = [];
+  loadVideoPage({ replace: true });
+}, 280);
+
+searchInput.addEventListener("input", () => {
+  searchClear.hidden = !searchInput.value;
+  runSearch();
+});
+
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    searchInput.value = "";
+    runSearch();
+  }
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.hidden = true;
+  runSearch();
+  searchInput.focus();
+});
 
 navBack.addEventListener("click", () => {
   if (!views.player.hidden && state.archive) return openArchive(state.archive);
   return openHome();
 });
 
-document.querySelectorAll(".sort").forEach((node) => {
-  node.addEventListener("click", () => openArchive(state.archive, { push: false, sort: node.dataset.sort }));
+sortControl.querySelectorAll(".sort").forEach((node) => {
+  node.addEventListener("click", () => {
+    if (node.dataset.sort === state.sort) return;
+    haptic(8);
+    openArchive(state.archive, { push: false, sort: node.dataset.sort });
+  });
 });
 
 document.getElementById("load-more").addEventListener("click", () => loadVideoPage());
 
-document.getElementById("menu-toggle").addEventListener("click", () => {
-  sheet.hidden = !sheet.hidden;
+if ("IntersectionObserver" in window) {
+  const sentinel = document.getElementById("load-sentinel");
+  new IntersectionObserver(
+    (entries) => {
+      if (!entries[0].isIntersecting || views.archive.hidden) return;
+      if (state.videos.length > 0 && state.videos.length < state.total) loadVideoPage();
+    },
+    { rootMargin: "600px 0px" },
+  ).observe(sentinel);
+}
+
+document.getElementById("upnext-play").addEventListener("click", () => {
+  const next = upNext.video;
+  cancelUpNext();
+  if (next) openPlayer(next.id);
 });
 
-document.getElementById("sheet-close").addEventListener("click", () => {
-  sheet.hidden = true;
-});
+document.getElementById("upnext-cancel").addEventListener("click", cancelUpNext);
+
+document.getElementById("menu-toggle").addEventListener("click", () => (sheet.hidden ? openSheet() : closeSheet()));
+document.getElementById("sheet-close").addEventListener("click", closeSheet);
 
 sheet.addEventListener("click", (event) => {
-  if (event.target === sheet) sheet.hidden = true;
+  if (event.target === sheet) closeSheet();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !sheet.hidden) closeSheet();
+  if (event.key === "/" && !views.archive.hidden && document.activeElement !== searchInput) {
+    event.preventDefault();
+    searchInput.focus();
+  }
 });
 
 document.getElementById("logout-button").addEventListener("click", async () => {
   player.teardown();
-  try {
-    await api.post("/api/gate/logout");
-  } catch {
-    /* leaving regardless */
-  }
+  await api.post("/api/gate/logout").catch(() => null);
   leaveToGate();
 });
 
-window.addEventListener("popstate", () => route(false));
+window.addEventListener("popstate", () => route());
 
-startPresence({ onExpired: (error) => leaveToGate(error.message) });
+trackScroll();
+enhanceButtons();
+watchSegmented(sortControl);
+startPresence({
+  onExpired: (error) => leaveToGate(error.status === 401 ? SESSION_ENDED_MESSAGE : error.message),
+});
 route();

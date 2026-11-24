@@ -4,16 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#07070a" />
+    <meta name="theme-color" content="#09070c" />
     <title>Get Pleasure — Owner Console</title>
+    <link rel="preload" href="/fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/css/theme.css" />
     <link rel="stylesheet" href="/css/admin.css" />
   </head>
   <body class="admin-body">
-    <section class="login" id="login-view">
+    <section class="login" id="login-view" hidden>
       <form class="login__card" id="login-form" autocomplete="off">
-        <p class="login__eyebrow">Owner console</p>
-        <h1 class="login__title wordmark">Get&nbsp;Pleasure</h1>
+        <span class="login__badge" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+        </span>
+        <p class="eyebrow">Owner console</p>
+        <h1 class="login__title wordmark">Get <em>Pleasure</em></h1>
+        <p class="login__sub">Sign in with the admin token from your server's environment.</p>
         <label class="field">
           <span class="field__label">Admin access token</span>
           <input
@@ -27,54 +36,86 @@
           />
         </label>
         <p class="notice notice--error" id="login-error" role="alert" hidden></p>
-        <button class="btn btn--primary btn--block" type="submit">Open console</button>
+        <button class="btn btn--primary btn--block" type="submit">
+          Open console
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </button>
       </form>
     </section>
 
     <div id="console-view" hidden>
       <header class="topbar">
-        <span class="topbar__brand wordmark">Owner&nbsp;Console</span>
+        <span class="topbar__brand wordmark">Owner <em>Console</em></span>
         <div class="topbar__meta">
           <span class="pill pill--live" id="live-pill">0 live</span>
-          <button class="btn btn--ghost btn--sm" id="admin-logout" type="button">Exit</button>
+          <button class="icon-btn" id="admin-logout" type="button" aria-label="Sign out of the console">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M14.5 4.5h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-3M10 16.5 5.5 12 10 7.5M5.5 12H15" />
+            </svg>
+          </button>
         </div>
       </header>
 
-      <nav class="tabs" id="tabs" role="tablist">
-        <button class="tab is-active" data-tab="dashboard" role="tab" type="button">Dashboard</button>
-        <button class="tab" data-tab="library" role="tab" type="button">Library</button>
-        <button class="tab" data-tab="keys" role="tab" type="button">Access keys</button>
-        <button class="tab" data-tab="broadcast" role="tab" type="button">Broadcast</button>
-        <button class="tab" data-tab="activity" role="tab" type="button">Activity</button>
+      <nav class="tabs-wrap" aria-label="Console sections">
+        <div class="segmented tabs" id="tabs" role="tablist">
+          <span class="segmented__indicator" aria-hidden="true"></span>
+          <button class="segmented__item tab is-active" data-tab="dashboard" role="tab" type="button">Dashboard</button>
+          <button class="segmented__item tab" data-tab="library" role="tab" type="button">Library</button>
+          <button class="segmented__item tab" data-tab="keys" role="tab" type="button">Access keys</button>
+          <button class="segmented__item tab" data-tab="broadcast" role="tab" type="button">Broadcast</button>
+          <button class="segmented__item tab" data-tab="activity" role="tab" type="button">Activity</button>
+        </div>
       </nav>
 
       <main class="admin-main">
         <section class="panel" data-panel="dashboard">
+          <header class="panel-head">
+            <p class="eyebrow" id="dash-date"></p>
+            <h1 class="panel-head__title"><span id="dash-when">Today</span> at a <em>glance</em></h1>
+          </header>
           <div class="stats" id="stats"></div>
           <div class="card">
-            <h2 class="panel__title">Server</h2>
+            <h2 class="card__title">Server</h2>
             <dl class="kv" id="server-info"></dl>
           </div>
         </section>
 
         <section class="panel" data-panel="library" hidden>
+          <header class="panel-head">
+            <p class="eyebrow">Library</p>
+            <h1 class="panel-head__title">Curate the <em>collection</em></h1>
+          </header>
+
           <div class="card">
-            <h2 class="panel__title">Category codes</h2>
-            <p class="panel__hint">
-              A category code is what you put on an access key. Buyers with that code see the
-              archives you file under it.
-            </p>
+            <div class="card__head">
+              <span class="step">01</span>
+              <div>
+                <h2 class="card__title">Category codes</h2>
+                <p class="card__hint">
+                  The number you put on an access key. Buyers with that code see the archives filed
+                  under it.
+                </p>
+              </div>
+            </div>
             <form class="inline-form" id="category-form">
               <input class="input" id="category-code" placeholder="Code, e.g. 12" inputmode="numeric" required />
               <input class="input" id="category-name" placeholder="Display name, e.g. Premium" required />
-              <button class="btn btn--primary btn--sm" type="submit">Create</button>
+              <button class="btn btn--primary btn--sm" type="submit">Create code</button>
             </form>
             <p class="notice notice--error" id="category-error" role="alert" hidden></p>
             <div class="list" id="category-list"></div>
           </div>
 
           <div class="card">
-            <h2 class="panel__title">Archives</h2>
+            <div class="card__head">
+              <span class="step">02</span>
+              <div>
+                <h2 class="card__title">Archives</h2>
+                <p class="card__hint">A named collection of videos inside one category.</p>
+              </div>
+            </div>
             <form class="inline-form" id="archive-form">
               <select class="input" id="archive-category" required></select>
               <input class="input" id="archive-name" placeholder="Archive name, e.g. Season One" required />
@@ -85,15 +126,24 @@
           </div>
 
           <div class="card">
-            <h2 class="panel__title">Import from your VPS</h2>
-            <p class="panel__hint">
-              Browse the media folder on your server, then import a folder of videos or a .zip file
-              into an archive. Files are read in place and are never exposed by a public path.
-            </p>
+            <div class="card__head">
+              <span class="step">03</span>
+              <div>
+                <h2 class="card__title">Import from your VPS</h2>
+                <p class="card__hint">
+                  Pick a folder of videos or a .zip on your server. Files are read in place and are
+                  never exposed by a public path.
+                </p>
+              </div>
+            </div>
             <div class="browser">
               <div class="browser__bar">
-                <button class="btn btn--ghost btn--sm" id="fs-up" type="button">Up</button>
-                <code class="browser__path mono" id="fs-path">/</code>
+                <button class="icon-btn icon-btn--sm" id="fs-up" type="button" aria-label="Up one folder">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="m6 15 6-6 6 6" />
+                  </svg>
+                </button>
+                <nav class="crumbs mono" id="fs-path" aria-label="Current folder">/</nav>
               </div>
               <div class="browser__list" id="fs-list"></div>
             </div>
@@ -102,7 +152,7 @@
             <div class="import-box">
               <div class="import-box__row">
                 <span class="field__label">Selected</span>
-                <code class="mono" id="import-selection">Nothing selected</code>
+                <code class="mono import-box__selection" id="import-selection">Nothing selected yet</code>
               </div>
               <div class="inline-form">
                 <select class="input" id="import-archive"></select>
@@ -116,24 +166,59 @@
         </section>
 
         <section class="panel" data-panel="keys" hidden>
+          <header class="panel-head">
+            <p class="eyebrow">Access keys</p>
+            <h1 class="panel-head__title">Issue and <em>manage</em></h1>
+          </header>
+
           <div class="card">
-            <h2 class="panel__title">Create an access key</h2>
-            <form class="inline-form" id="key-form">
-              <input class="input" id="key-days" type="number" min="1" value="30" placeholder="Validity in days" required />
-              <select class="input" id="key-category" required></select>
-              <input class="input" id="key-label" placeholder="Note, e.g. buyer name (optional)" />
-              <button class="btn btn--primary btn--sm" type="submit">Generate key</button>
+            <h2 class="card__title">Create an access key</h2>
+            <form class="key-form" id="key-form">
+              <div class="field">
+                <label class="field__label" for="key-days">Valid for</label>
+                <div class="days">
+                  <input class="input days__input" id="key-days" type="number" min="1" value="30" inputmode="numeric" required />
+                  <span class="days__unit">days</span>
+                </div>
+                <div class="presets" id="day-presets">
+                  <button class="preset" data-days="7" type="button">7 days</button>
+                  <button class="preset is-active" data-days="30" type="button">30 days</button>
+                  <button class="preset" data-days="90" type="button">90 days</button>
+                  <button class="preset" data-days="365" type="button">1 year</button>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field__label" for="key-category">Category code</label>
+                <select class="input" id="key-category" required></select>
+              </div>
+              <div class="field">
+                <label class="field__label" for="key-label">Note (optional)</label>
+                <input class="input" id="key-label" placeholder="Buyer name or order number" />
+              </div>
+              <button class="btn btn--primary btn--block" type="submit">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="8" cy="15" r="4" />
+                  <path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" />
+                </svg>
+                Generate key
+              </button>
             </form>
             <p class="notice notice--error" id="key-error" role="alert" hidden></p>
             <div class="keyout" id="key-output" hidden>
-              <p class="keyout__warn">Copy this key now. It is shown only once.</p>
+              <p class="keyout__warn">Copy this now. It is shown only once.</p>
               <code class="keyout__value mono" id="key-value"></code>
-              <button class="btn btn--ghost btn--sm" id="key-copy" type="button">Copy key</button>
+              <button class="btn btn--ghost btn--sm" id="key-copy" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5" />
+                  <path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" />
+                </svg>
+                <span id="key-copy-label">Copy key</span>
+              </button>
             </div>
           </div>
 
           <div class="card">
-            <h2 class="panel__title">Subscriptions</h2>
+            <h2 class="card__title">Subscriptions</h2>
             <div class="filters">
               <select class="input" id="key-filter">
                 <option value="">All</option>
@@ -148,11 +233,15 @@
         </section>
 
         <section class="panel" data-panel="broadcast" hidden>
+          <header class="panel-head">
+            <p class="eyebrow">Broadcast</p>
+            <h1 class="panel-head__title">Speak to every <em>screen</em></h1>
+          </header>
+
           <div class="card">
-            <h2 class="panel__title">Pop a message on every screen</h2>
-            <p class="panel__hint">
+            <p class="card__hint">
               Viewers see this within about 20 seconds. It stays until they press "I Read", and each
-              acknowledgement is counted below.
+              acknowledgement is counted.
             </p>
             <form id="broadcast-form">
               <label class="field">
@@ -164,27 +253,37 @@
                 <textarea class="input" id="bc-message" rows="4" placeholder="What do you want everyone to know?" required></textarea>
               </label>
               <label class="field">
-                <span class="field__label">Limit to one category (optional)</span>
+                <span class="field__label">Audience</span>
                 <select class="input" id="bc-category"></select>
               </label>
               <p class="notice notice--error" id="bc-error" role="alert" hidden></p>
-              <button class="btn btn--primary btn--block" type="submit">Send broadcast</button>
+              <button class="btn btn--primary btn--block" type="submit">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 10v4a1.5 1.5 0 0 0 1.5 1.5H7l9 4.5V4L7 8.5H5.5A1.5 1.5 0 0 0 4 10z" />
+                  <path d="M19.5 9.5a3.5 3.5 0 0 1 0 5" />
+                </svg>
+                Send broadcast
+              </button>
             </form>
           </div>
 
           <div class="card">
-            <h2 class="panel__title">Sent broadcasts</h2>
+            <h2 class="card__title">Sent broadcasts</h2>
             <div class="list" id="broadcast-list"></div>
           </div>
         </section>
 
         <section class="panel" data-panel="activity" hidden>
+          <header class="panel-head">
+            <p class="eyebrow">Activity</p>
+            <h1 class="panel-head__title">Who is <em>watching</em></h1>
+          </header>
           <div class="card">
-            <h2 class="panel__title">Live viewers</h2>
+            <h2 class="card__title">Live viewers</h2>
             <div class="list" id="live-list"></div>
           </div>
           <div class="card">
-            <h2 class="panel__title">Recent activity</h2>
+            <h2 class="card__title">Recent activity</h2>
             <div class="list" id="audit-list"></div>
           </div>
         </section>

@@ -58,6 +58,7 @@ function createAuthMiddleware({ config, accessKeys, sessions }) {
         keyId: result.keyDoc._id,
         keyHint: result.keyDoc.keyHint,
         categoryCode: result.keyDoc.categoryCode,
+        planStartsAt: result.keyDoc.planStartsAt,
         planExpiresAt: result.keyDoc.planExpiresAt,
         ip: result.ip,
         ipFingerprint: result.fingerprint,
