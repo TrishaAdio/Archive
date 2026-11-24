@@ -281,7 +281,7 @@ async function main() {
     await page.waitForURL("**/watch", { timeout: 10000 });
     const unlockMs = Date.now() - unlockStarted;
     check("correct key opens the library", page.url().includes("/watch"));
-    check("unlock sequence finishes in about two seconds", unlockMs >= 1500 && unlockMs < 6000, `${unlockMs} ms`);
+    check("unlock sequence plays out over about three and a half seconds", unlockMs >= 3000 && unlockMs < 6500, `${unlockMs} ms`);
     check("watch page plays the arrival transition", (await page.evaluate(() => document.documentElement.getAttribute("data-arrival"))) === "on");
 
     section("Home view");

@@ -61,12 +61,19 @@ function showReasonFromUrl() {
   window.history.replaceState({}, "", "/");
 }
 
-function sparkBurst(count = 34) {
-  burst.innerHTML = "";
+const UNLOCK_TIMELINE = {
+  burstAt: 1050,
+  irisAt: 2300,
+  leaveAt: 3400,
+};
+
+function prepareSparks(count = window.innerWidth < 600 ? 24 : 32) {
+  if (burst.childElementCount) return;
+  const fragment = document.createDocumentFragment();
   for (let index = 0; index < count; index++) {
     const spark = document.createElement("span");
     const angle = (Math.PI * 2 * index) / count + Math.random() * 0.4;
-    const distance = 90 + Math.random() * 120;
+    const distance = 100 + Math.random() * 130;
     const size = 4 + Math.random() * 7;
     spark.className = "spark";
     spark.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
@@ -75,16 +82,24 @@ function sparkBurst(count = 34) {
     spark.style.setProperty("--color", SPARK_COLORS[index % SPARK_COLORS.length]);
     spark.style.setProperty("--radius", index % 3 === 0 ? "2px" : "50%");
     spark.style.setProperty("--spin", `${Math.round(Math.random() * 540 - 270)}deg`);
-    spark.style.setProperty("--duration", `${750 + Math.round(Math.random() * 500)}ms`);
-    spark.style.setProperty("--delay", `${Math.round(Math.random() * 90)}ms`);
-    burst.appendChild(spark);
+    spark.style.setProperty("--duration", `${1200 + Math.round(Math.random() * 600)}ms`);
+    spark.style.setProperty("--delay", `${Math.round(Math.random() * 160)}ms`);
+    fragment.appendChild(spark);
   }
+  burst.appendChild(fragment);
+}
+
+function prepareIris() {
+  const rect = seal.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  const reach = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+  iris.style.setProperty("--iris-x", `${x}px`);
+  iris.style.setProperty("--iris-y", `${y}px`);
+  iris.style.setProperty("--iris-scale", String(Math.ceil((reach * 2.3) / 120)));
 }
 
 function openIris() {
-  const rect = seal.getBoundingClientRect();
-  iris.style.setProperty("--iris-x", `${rect.left + rect.width / 2}px`);
-  iris.style.setProperty("--iris-y", `${rect.top + rect.height / 2}px`);
   iris.classList.add("is-open");
 }
 
@@ -111,15 +126,16 @@ function celebrateAndEnter() {
     return;
   }
 
-  haptic([12, 50, 12, 50, 40]);
+  prepareSparks();
+  prepareIris();
+  haptic([12, 60, 12, 60, 40]);
   seal.classList.add("is-unlocking");
   setTimeout(() => {
     seal.classList.add("is-unlocked");
-    sparkBurst();
     haptic(30);
-  }, 620);
-  setTimeout(openIris, 1250);
-  setTimeout(() => window.location.replace("/watch"), 2050);
+  }, UNLOCK_TIMELINE.burstAt);
+  setTimeout(openIris, UNLOCK_TIMELINE.irisAt);
+  setTimeout(() => window.location.replace("/watch"), UNLOCK_TIMELINE.leaveAt);
 }
 
 input.addEventListener("input", () => {
@@ -156,6 +172,7 @@ form.addEventListener("submit", async (event) => {
   clearError();
   reasonBox.hidden = true;
   setBusy(true);
+  requestAnimationFrame(() => prepareSparks());
 
   try {
     await api.post("/api/gate/redeem", { key });
