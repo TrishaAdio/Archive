@@ -130,11 +130,11 @@ async function main() {
   await page.fill("#key-input", key.key);
   await page.click("#gate-submit");
   await page.waitForSelector("#gate-seal.is-unlocked", { timeout: 6000 });
-  await page.waitForTimeout(260);
+  await page.waitForTimeout(420);
   await page.screenshot({ path: path.join(OUT, "01c-gate-unlocking.png") });
   console.log("saved 01c-gate-unlocking.png");
   await page.waitForSelector("#iris.is-open", { timeout: 4000 });
-  await page.waitForTimeout(380);
+  await page.waitForTimeout(520);
   await page.screenshot({ path: path.join(OUT, "01d-gate-iris.png") });
   console.log("saved 01d-gate-iris.png");
   await page.waitForURL("**/watch");

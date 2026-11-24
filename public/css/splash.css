@@ -226,19 +226,33 @@ html[data-splash="on"] body {
   z-index: 250;
   pointer-events: none;
   visibility: hidden;
-  background:
-    radial-gradient(circle at var(--iris-x, 50%) var(--iris-y, 20%), #fff1e8 0%, #ffae8a 10%, #ff5fbf 26%, #8a1f73 48%, #2a0d2a 70%, var(--bg) 92%);
-  clip-path: circle(0 at var(--iris-x, 50%) var(--iris-y, 20%));
+  overflow: hidden;
+}
+
+.iris__dot {
+  position: absolute;
+  top: var(--iris-y, 20%);
+  left: var(--iris-x, 50%);
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff1e8 0%, #ffae8a 14%, #ff5fbf 32%, #8a1f73 52%, #2a0d2a 72%, var(--bg) 88%);
+  transform: scale(0);
+  will-change: transform;
 }
 
 .iris.is-open {
   visibility: visible;
-  animation: irisOpen 0.85s var(--ease-in-out) forwards;
 }
 
-@keyframes irisOpen {
+.iris.is-open .iris__dot {
+  animation: irisGrow 1.2s var(--ease-in-out) forwards;
+}
+
+@keyframes irisGrow {
   to {
-    clip-path: circle(150vmax at var(--iris-x, 50%) var(--iris-y, 20%));
+    transform: scale(var(--iris-scale, 30));
   }
 }
 
@@ -253,7 +267,8 @@ html[data-splash="on"] body {
 
 html[data-arrival="on"] .arrival {
   display: block;
-  animation: arrive 0.9s 0.05s var(--ease-out) forwards;
+  animation: arrive 1.2s 0.05s var(--ease-out) forwards;
+  will-change: opacity, transform;
 }
 
 @keyframes arrive {
