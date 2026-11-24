@@ -9,7 +9,61 @@ One Node process serves the API and the three pages. No build step.
 - `/watch` — library, archive listing, player
 - `/admin` — owner console
 
-## Install
+## One-command install on a VPS
+
+On a fresh Ubuntu 22.04/24.04 or Debian 12 server:
+
+```bash
+git clone https://github.com/TrishaAdio/Archive.git
+cd Archive
+sudo bash setup.sh
+```
+
+When it finishes it prints the link to open, for example:
+
+```
+  Website        http://203.0.113.10:3000
+  Owner console  http://203.0.113.10:3000/admin
+  Admin token    3f9c…
+```
+
+The same summary is saved to `/root/getpleasure-access.txt`, readable by root only.
+
+What the script does:
+
+1. Checks the OS, CPU, RAM and that the port is free.
+2. Installs Node.js 22, ffmpeg (for thumbnails), and MongoDB 8.0 as a single-node replica set
+   that only listens on `127.0.0.1`.
+3. Copies the app to `/opt/getpleasure`, installs production dependencies, and creates a
+   `getpleasure` system user to run it.
+4. Generates the admin token and secrets into `/etc/getpleasure/getpleasure.env`.
+5. Registers a systemd service that starts on boot and restarts on crash.
+6. Opens the port in ufw, firewalld, or iptables, whichever is active.
+7. Starts the site, waits for it to report healthy, and prints the `http://IP:PORT` link.
+
+Options:
+
+| Flag | Default | |
+| --- | --- | --- |
+| `--port N` | `3000` | Port the site listens on |
+| `--media PATH` | `/srv/getpleasure/media` | Folder the admin console can browse |
+| `--mongodb-uri URI` | local install | Use Atlas or another replica set instead |
+| `--ip-mode MODE` | `relaxed` | `strict` locks keys to the exact IP |
+
+Re-run `sudo bash setup.sh` after `git pull` to update. It keeps your admin token, secrets,
+port and data.
+
+Things the script cannot do for you:
+
+- **Cloud firewalls.** AWS security groups, Oracle security lists, and the GCP, Azure and Hetzner
+  firewalls sit outside the server. Allow TCP on your port there as well.
+- **CPUs without AVX.** MongoDB 8.0 needs AVX. On older or very cheap CPUs the script stops and
+  tells you to use a free MongoDB Atlas cluster with `--mongodb-uri`.
+- **HTTPS.** The link is plain HTTP, so access keys and session cookies travel unencrypted, and
+  the Paste and Copy buttons fall back to manual paste because browsers only allow clipboard
+  access over HTTPS. Point a domain at the server and put HTTPS in front before selling keys.
+
+## Manual install
 
 ```bash
 npm install
