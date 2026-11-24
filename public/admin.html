@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#07070a" />
+    <title>Get Pleasure — Owner Console</title>
+    <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/admin.css" />
+  </head>
+  <body class="admin-body">
+    <section class="login" id="login-view">
+      <form class="login__card" id="login-form" autocomplete="off">
+        <p class="login__eyebrow">Owner console</p>
+        <h1 class="login__title wordmark">Get&nbsp;Pleasure</h1>
+        <label class="field">
+          <span class="field__label">Admin access token</span>
+          <input
+            class="input mono"
+            id="admin-token"
+            type="password"
+            placeholder="Paste your admin token"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
+        </label>
+        <p class="notice notice--error" id="login-error" role="alert" hidden></p>
+        <button class="btn btn--primary btn--block" type="submit">Open console</button>
+      </form>
+    </section>
+
+    <div id="console-view" hidden>
+      <header class="topbar">
+        <span class="topbar__brand wordmark">Owner&nbsp;Console</span>
+        <div class="topbar__meta">
+          <span class="pill pill--live" id="live-pill">0 live</span>
+          <button class="btn btn--ghost btn--sm" id="admin-logout" type="button">Exit</button>
+        </div>
+      </header>
+
+      <nav class="tabs" id="tabs" role="tablist">
+        <button class="tab is-active" data-tab="dashboard" role="tab" type="button">Dashboard</button>
+        <button class="tab" data-tab="library" role="tab" type="button">Library</button>
+        <button class="tab" data-tab="keys" role="tab" type="button">Access keys</button>
+        <button class="tab" data-tab="broadcast" role="tab" type="button">Broadcast</button>
+        <button class="tab" data-tab="activity" role="tab" type="button">Activity</button>
+      </nav>
+
+      <main class="admin-main">
+        <section class="panel" data-panel="dashboard">
+          <div class="stats" id="stats"></div>
+          <div class="card">
+            <h2 class="panel__title">Server</h2>
+            <dl class="kv" id="server-info"></dl>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="library" hidden>
+          <div class="card">
+            <h2 class="panel__title">Category codes</h2>
+            <p class="panel__hint">
+              A category code is what you put on an access key. Buyers with that code see the
+              archives you file under it.
+            </p>
+            <form class="inline-form" id="category-form">
+              <input class="input" id="category-code" placeholder="Code, e.g. 12" inputmode="numeric" required />
+              <input class="input" id="category-name" placeholder="Display name, e.g. Premium" required />
+              <button class="btn btn--primary btn--sm" type="submit">Create</button>
+            </form>
+            <p class="notice notice--error" id="category-error" role="alert" hidden></p>
+            <div class="list" id="category-list"></div>
+          </div>
+
+          <div class="card">
+            <h2 class="panel__title">Archives</h2>
+            <form class="inline-form" id="archive-form">
+              <select class="input" id="archive-category" required></select>
+              <input class="input" id="archive-name" placeholder="Archive name, e.g. Season One" required />
+              <button class="btn btn--primary btn--sm" type="submit">Create archive</button>
+            </form>
+            <p class="notice notice--error" id="archive-error" role="alert" hidden></p>
+            <div class="list" id="archive-list"></div>
+          </div>
+
+          <div class="card">
+            <h2 class="panel__title">Import from your VPS</h2>
+            <p class="panel__hint">
+              Browse the media folder on your server, then import a folder of videos or a .zip file
+              into an archive. Files are read in place and are never exposed by a public path.
+            </p>
+            <div class="browser">
+              <div class="browser__bar">
+                <button class="btn btn--ghost btn--sm" id="fs-up" type="button">Up</button>
+                <code class="browser__path mono" id="fs-path">/</code>
+              </div>
+              <div class="browser__list" id="fs-list"></div>
+            </div>
+            <p class="notice notice--error" id="fs-error" role="alert" hidden></p>
+
+            <div class="import-box">
+              <div class="import-box__row">
+                <span class="field__label">Selected</span>
+                <code class="mono" id="import-selection">Nothing selected</code>
+              </div>
+              <div class="inline-form">
+                <select class="input" id="import-archive"></select>
+                <button class="btn btn--primary btn--sm" id="import-button" type="button" disabled>
+                  Import into archive
+                </button>
+              </div>
+              <p class="notice notice--ok" id="import-result" role="status" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="keys" hidden>
+          <div class="card">
+            <h2 class="panel__title">Create an access key</h2>
+            <form class="inline-form" id="key-form">
+              <input class="input" id="key-days" type="number" min="1" value="30" placeholder="Validity in days" required />
+              <select class="input" id="key-category" required></select>
+              <input class="input" id="key-label" placeholder="Note, e.g. buyer name (optional)" />
+              <button class="btn btn--primary btn--sm" type="submit">Generate key</button>
+            </form>
+            <p class="notice notice--error" id="key-error" role="alert" hidden></p>
+            <div class="keyout" id="key-output" hidden>
+              <p class="keyout__warn">Copy this key now. It is shown only once.</p>
+              <code class="keyout__value mono" id="key-value"></code>
+              <button class="btn btn--ghost btn--sm" id="key-copy" type="button">Copy key</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="panel__title">Subscriptions</h2>
+            <div class="filters">
+              <select class="input" id="key-filter">
+                <option value="">All</option>
+                <option value="active">Active only</option>
+                <option value="expired">Expired</option>
+                <option value="revoked">Cancelled</option>
+              </select>
+              <input class="input" id="key-search" placeholder="Search note or key hint" />
+            </div>
+            <div class="list" id="key-list"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="broadcast" hidden>
+          <div class="card">
+            <h2 class="panel__title">Pop a message on every screen</h2>
+            <p class="panel__hint">
+              Viewers see this within about 20 seconds. It stays until they press "I Read", and each
+              acknowledgement is counted below.
+            </p>
+            <form id="broadcast-form">
+              <label class="field">
+                <span class="field__label">Title</span>
+                <input class="input" id="bc-title" placeholder="Scheduled maintenance" />
+              </label>
+              <label class="field">
+                <span class="field__label">Message</span>
+                <textarea class="input" id="bc-message" rows="4" placeholder="What do you want everyone to know?" required></textarea>
+              </label>
+              <label class="field">
+                <span class="field__label">Limit to one category (optional)</span>
+                <select class="input" id="bc-category"></select>
+              </label>
+              <p class="notice notice--error" id="bc-error" role="alert" hidden></p>
+              <button class="btn btn--primary btn--block" type="submit">Send broadcast</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2 class="panel__title">Sent broadcasts</h2>
+            <div class="list" id="broadcast-list"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="activity" hidden>
+          <div class="card">
+            <h2 class="panel__title">Live viewers</h2>
+            <div class="list" id="live-list"></div>
+          </div>
+          <div class="card">
+            <h2 class="panel__title">Recent activity</h2>
+            <div class="list" id="audit-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/js/admin.js"></script>
+  </body>
+</html>

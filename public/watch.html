@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#07070a" />
+    <title>Get Pleasure</title>
+    <link rel="stylesheet" href="/css/theme.css" />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body class="app-body">
+    <header class="topbar">
+      <button class="topbar__back" id="nav-back" type="button" aria-label="Go back" hidden>
+        <span aria-hidden="true">‹</span>
+      </button>
+      <a class="topbar__brand wordmark" href="/watch">Get&nbsp;Pleasure</a>
+      <div class="topbar__meta">
+        <span class="pill" id="plan-pill" hidden></span>
+        <button class="topbar__menu" id="menu-toggle" type="button" aria-label="Account menu">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+            <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="sheet" id="account-sheet" hidden>
+      <div class="sheet__panel">
+        <h2 class="sheet__title">Your access</h2>
+        <dl class="sheet__list">
+          <div class="sheet__row"><dt>Key</dt><dd class="mono" id="account-key">—</dd></div>
+          <div class="sheet__row"><dt>Tier</dt><dd id="account-tier">—</dd></div>
+          <div class="sheet__row"><dt>Locked to IP</dt><dd class="mono" id="account-ip">—</dd></div>
+          <div class="sheet__row"><dt>Plan ends</dt><dd id="account-expiry">—</dd></div>
+        </dl>
+        <button class="btn btn--ghost btn--block" id="sheet-close" type="button">Close</button>
+        <button class="btn btn--danger btn--block" id="logout-button" type="button">Sign out</button>
+      </div>
+    </div>
+
+    <main class="main" id="main">
+      <section class="view" id="view-home" data-view="home">
+        <div class="hero">
+          <p class="hero__eyebrow" id="hero-eyebrow">Your tier</p>
+          <h1 class="hero__title" id="hero-title">Loading…</h1>
+          <p class="hero__sub" id="hero-sub"></p>
+        </div>
+
+        <div id="resume-section" hidden>
+          <div class="section-head">
+            <h2 class="section-head__title">Pick up where you left off</h2>
+          </div>
+          <div class="rail" id="resume-rail"></div>
+        </div>
+
+        <div class="section-head">
+          <h2 class="section-head__title">Archives</h2>
+          <span class="section-head__count" id="archive-count"></span>
+        </div>
+        <div class="archive-grid" id="archive-grid"></div>
+        <p class="empty" id="archive-empty" hidden>
+          No archives have been published for your tier yet. Check back soon.
+        </p>
+      </section>
+
+      <section class="view" id="view-archive" data-view="archive" hidden>
+        <div class="archive-head">
+          <h1 class="archive-head__title" id="archive-title">Archive</h1>
+          <p class="archive-head__sub" id="archive-sub"></p>
+        </div>
+
+        <div class="sorts" role="tablist" aria-label="Sort videos">
+          <button class="sort is-active" data-sort="popular" role="tab" type="button">Most watched</button>
+          <button class="sort" data-sort="liked" role="tab" type="button">Most liked</button>
+          <button class="sort" data-sort="number" role="tab" type="button">By number</button>
+          <button class="sort" data-sort="newest" role="tab" type="button">Newest</button>
+        </div>
+
+        <div class="video-grid" id="video-grid"></div>
+        <div class="loadmore">
+          <button class="btn btn--ghost" id="load-more" type="button" hidden>Load more</button>
+          <p class="loadmore__status" id="video-status"></p>
+        </div>
+      </section>
+
+      <section class="view" id="view-player" data-view="player" hidden>
+        <div class="player">
+          <div class="player__stage" id="player-stage">
+            <video
+              class="player__video"
+              id="player-video"
+              playsinline
+              controls
+              preload="auto"
+              controlslist="nodownload noremoteplayback"
+              disablepictureinpicture
+            ></video>
+            <div class="player__watermark" id="player-watermark" aria-hidden="true"></div>
+            <div class="player__spinner" id="player-spinner"><div class="spinner"></div></div>
+          </div>
+
+          <div class="player__info">
+            <div class="player__heading">
+              <span class="player__number" id="player-number">#0</span>
+              <h1 class="player__title" id="player-title">—</h1>
+            </div>
+            <p class="player__meta" id="player-meta"></p>
+
+            <div class="player__actions">
+              <button class="like" id="like-button" type="button" aria-pressed="false">
+                <span class="like__icon" aria-hidden="true">
+                  <svg class="icon icon--solid" viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z" />
+                  </svg>
+                </span>
+                <span class="like__count" id="like-count">0</span>
+                <span class="sr-only">Like this video</span>
+              </button>
+              <button class="btn btn--ghost btn--sm" id="back-to-archive" type="button">
+                Back to archive
+              </button>
+            </div>
+
+            <p class="notice notice--error" id="player-error" role="alert" hidden></p>
+            <p class="player__guard">
+              Playback is signed for your session and expires quickly. Saving or re-sharing the
+              stream is not permitted.
+            </p>
+          </div>
+
+          <div id="upnext-section" hidden>
+            <div class="section-head">
+              <h2 class="section-head__title">Up next</h2>
+            </div>
+            <div class="rail" id="upnext-rail"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal" id="broadcast-modal" role="alertdialog" aria-modal="true" aria-labelledby="broadcast-title" hidden>
+      <div class="modal__panel">
+        <p class="modal__eyebrow">Message from the owner</p>
+        <h2 class="modal__title" id="broadcast-title">Announcement</h2>
+        <p class="modal__body" id="broadcast-message"></p>
+        <button class="btn btn--primary btn--block" id="broadcast-ack" type="button">I Read</button>
+      </div>
+    </div>
+
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

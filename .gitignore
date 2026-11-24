@@ -1,0 +1,7 @@
+node_modules/
+.env
+media/
+*.log
+harness.json
+screenshots/
+tests/fixtures/

@@ -1,0 +1,29 @@
+{
+  "name": "getpleasure",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "secrets": "node scripts/generate-secrets.mjs",
+    "test:e2e": "node tests/e2e.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "screenshots": "node tests/screenshots.mjs"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "mongodb": "^6.20.0",
+    "yauzl": "^3.2.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.2.3",
+    "playwright": "^1.65.1"
+  }
+}
