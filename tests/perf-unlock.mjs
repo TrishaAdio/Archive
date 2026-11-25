@@ -70,6 +70,66 @@ async function dragFinger(cdp) {
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 }
 
+const SCENARIO_LABELS = {
+  unlock: "Unlock animation",
+  touch: "Finger drag and scroll on the gate",
+  open: "Opening a video from the archive",
+  back: "Going back from a video to the archive",
+};
+
+async function seedArchive(mediaRoot) {
+  const folder = path.join(mediaRoot, "perf");
+  await fs.mkdir(folder, { recursive: true });
+  const sample = await fs.readFile(path.resolve(import.meta.dirname, "fixtures", "sample.webm"));
+  for (let index = 1; index <= 9; index++) await fs.writeFile(path.join(folder, `clip-${index}.webm`), sample);
+  const archive = await adminCall("POST", "/api/admin/archives", { categoryCode: 12, name: "Perf Archive" });
+  await adminCall("POST", `/api/admin/archives/${archive.id}/import`, { relPath: "perf" });
+}
+
+async function unlockInto(page, key) {
+  await page.fill("#key-input", key);
+  await page.locator("#gate-form").evaluate((form) => form.requestSubmit());
+  await page.waitForURL(/\/watch/, { timeout: 20000 });
+  await page.locator("#archive-grid [data-archive]").first().waitFor({ timeout: 20000 });
+  await page.waitForTimeout(1200);
+  await page.locator("#archive-grid [data-archive]").first().click();
+  await page.locator("#video-grid [data-video]").first().waitFor({ timeout: 20000 });
+  await page.waitForTimeout(1500);
+  if (SCENARIO === "back") {
+    await page.locator("#video-grid [data-video]").first().click();
+    await page.waitForTimeout(1500);
+    await page.locator("#pc-play").click();
+    await page.waitForFunction(() => document.getElementById("player-video")?.currentTime > 0.4, { timeout: 20000 });
+    await page.waitForTimeout(600);
+  }
+}
+
+function recordTransition(page, durationMs) {
+  return page.evaluate(
+    ({ duration, scenario }) =>
+      new Promise((resolve) => {
+        const samples = [];
+        let last = performance.now();
+        let firstMoveAt = null;
+        const startedAt = last;
+        let seenTransition = false;
+        const tick = (now) => {
+          const moving = document.documentElement.classList.contains("is-transitioning");
+          if (moving || !seenTransition) samples.push(now - last);
+          if (moving) seenTransition = true;
+          last = now;
+          if (firstMoveAt === null && document.documentElement.classList.contains("is-morphing")) firstMoveAt = now - startedAt;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        setTimeout(() => resolve({ samples, firstMoveAt }), duration);
+        if (scenario === "open") document.querySelector("#video-grid [data-video]").click();
+        else document.getElementById("nav-back").click();
+      }),
+    { duration: durationMs, scenario: SCENARIO },
+  );
+}
+
 async function main() {
   const mediaRoot = await fs.mkdtemp(path.join(os.tmpdir(), "gp-perf-"));
   const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
@@ -96,6 +156,8 @@ async function main() {
   }
 
   await adminCall("POST", "/api/admin/categories", { code: 12, name: "Premium" });
+  const transition = SCENARIO === "open" || SCENARIO === "back";
+  if (transition) await seedArchive(mediaRoot);
   const browser = await chromium.launch();
   const results = [];
 
@@ -114,7 +176,8 @@ async function main() {
       const cdp = await context.newCDPSession(page);
       await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => document.getElementById("seal-video")?.currentTime > 0.3, { timeout: 15000 });
-      await page.fill("#key-input", key.key);
+      if (transition) await unlockInto(page, key.key);
+      else await page.fill("#key-input", key.key);
       await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_SLOWDOWN });
 
       await browser.startTracing(page, {
@@ -128,7 +191,13 @@ async function main() {
       });
 
       const dragging = SCENARIO === "touch" ? dragFinger(cdp) : null;
-      const intervals = SCENARIO === "touch" ? await recordFrames(page, 3100) : await page.evaluate(
+      let firstMoveAt = null;
+      const recordTransitionFrames = async () => {
+        const recorded = await recordTransition(page, 1800);
+        firstMoveAt = recorded.firstMoveAt;
+        return recorded.samples;
+      };
+      const intervals = transition ? await recordTransitionFrames() : SCENARIO === "touch" ? await recordFrames(page, 3100) : await page.evaluate(
         () =>
           new Promise((resolve) => {
             const samples = [];
@@ -153,6 +222,7 @@ async function main() {
           }),
       );
 
+      if (process.env.SHOW_FRAMES) console.log("frames", intervals.map((v) => Math.round(v)).join(" "));
       await dragging;
       const trace = JSON.parse((await browser.stopTracing()).toString("utf8"));
       const events = trace.traceEvents ?? trace;
@@ -167,6 +237,27 @@ async function main() {
         }
         console.log(Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => `${k} ${Math.round(v)}ms`).join("\n"));
       }
+      if (process.env.TOP_EVENTS) {
+        const totals = {};
+        for (const event of events) {
+          if (!event.dur || event.ph !== "X") continue;
+          const detail = event.args?.data?.url?.split("/").pop() || event.args?.data?.functionName || event.args?.data?.type || "";
+          const key = `${event.name}:${detail}`.slice(0, 90);
+          totals[key] = (totals[key] ?? 0) + event.dur / 1000;
+        }
+        console.log(Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, v]) => `${k} ${Math.round(v)}ms`).join("\n"));
+        const mainTasks = events.filter((event) => event.name === "RunTask" && event.dur > Number(process.env.TASK_US ?? 30000));
+        for (const task of mainTasks.slice(0, 14)) {
+          const inside = events.filter(
+            (event) => event.tid === task.tid && event.ts >= task.ts && event.ts + (event.dur ?? 0) <= task.ts + task.dur && event.dur > 4000 && event !== task,
+          );
+          const label = inside
+            .slice(0, Number(process.env.TASK_PARTS ?? 8))
+            .map((event) => `${event.name}${event.args?.data?.functionName ? `(${event.args.data.functionName})` : ""}${event.args?.elementCount ? `[${event.args.elementCount}]` : ""}${event.args?.data?.url ? `<${event.args.data.url.split("/").pop()}>` : ""} ${Math.round(event.dur / 1000)}`)
+            .join(" | ");
+          console.log(`task ${Math.round(task.dur / 1000)}ms: ${label}`);
+        }
+      }
       const frames = events.filter((event) => event.name === "PipelineReporter" && event.ph === "b");
       const states = frames.map((event) => event.args?.chrome_frame_reporter?.state).filter(Boolean);
       const presented = states.filter((state) => state === "STATE_PRESENTED_ALL").length;
@@ -180,6 +271,7 @@ async function main() {
         paintMs: sumMs(["Paint", "PaintImage", "Rasterize", "RasterTask", "ImageDecodeTask"]),
         styleLayoutMs: sumMs(["UpdateLayoutTree", "Layout", "RecalculateStyles", "PrePaint"]),
         presented,
+        ...(transition ? { firstMoveMs: Math.round(firstMoveAt ?? -1) } : {}),
       });
       await context.close();
     }
@@ -193,7 +285,7 @@ async function main() {
   }
 
   const average = (field) => Math.round((results.reduce((sum, item) => sum + item[field], 0) / results.length) * 10) / 10;
-  console.log(`${SCENARIO === "touch" ? "Finger drag and scroll on the gate" : "Unlock animation"}, 390x844 @3x, CPU slowed ${CPU_SLOWDOWN}x, ${RUNS} runs`);
+  console.log(`${SCENARIO_LABELS[SCENARIO] ?? SCENARIO}, 390x844 @3x, CPU slowed ${CPU_SLOWDOWN}x, ${RUNS} runs`);
   for (const [index, item] of results.entries()) console.log(`  run ${index + 1}`, JSON.stringify(item));
   console.log(
     `  average  fps ${average("fps")}  p95 ${average("p95")} ms  worst ${average("worst")} ms  janky ${average("janky")}`,
