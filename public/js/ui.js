@@ -91,12 +91,79 @@ function confirmSheet({ title, message, confirmLabel = "Confirm", cancelLabel = 
   });
 }
 
-function withViewTransition(update) {
+function onScreen(node) {
+  if (!node?.isConnected) return false;
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
+function withViewTransition(update, morphs = []) {
   if (!document.startViewTransition || prefersReducedMotion()) {
     update();
     return Promise.resolve();
   }
-  return document.startViewTransition(update).finished.catch(() => {});
+
+  const pairs = morphs.filter((pair) => onScreen(pair.from));
+  pairs.forEach((pair) => (pair.from.style.viewTransitionName = pair.name));
+
+  const transition = document.startViewTransition(() => {
+    pairs.forEach((pair) => (pair.from.style.viewTransitionName = ""));
+    update();
+    pairs.forEach((pair) => {
+      const target = pair.to();
+      if (!target) return;
+      target.style.viewTransitionName = pair.name;
+      pair.target = target;
+    });
+  });
+
+  const cleanUp = () => {
+    pairs.forEach((pair) => {
+      pair.from.style.viewTransitionName = "";
+      if (pair.target) pair.target.style.viewTransitionName = "";
+    });
+  };
+  return transition.finished.then(cleanUp, cleanUp);
+}
+
+function splitReveal(node, { delay = 0, play = true } = {}) {
+  if (!node) return;
+  const pieces = [];
+  node.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      child.textContent.split(/(\s+)/).forEach((part) => {
+        if (!part) return;
+        if (/^\s+$/.test(part)) pieces.push(document.createTextNode(" "));
+        else pieces.push(wrapWord(document.createTextNode(part)));
+      });
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      pieces.push(wrapWord(child.cloneNode(true)));
+    }
+  });
+
+  node.replaceChildren(...pieces);
+  node.querySelectorAll(".wi").forEach((word, index) => word.style.setProperty("--i", String(index)));
+  node.style.setProperty("--split-delay", `${delay}ms`);
+  node.classList.add("split");
+  node.classList.remove("is-in");
+  if (!play) return;
+  void node.offsetWidth;
+  node.classList.add("is-in");
+}
+
+function wrapWord(content) {
+  const outer = document.createElement("span");
+  outer.className = "w";
+  if (content.nodeType === Node.ELEMENT_NODE) {
+    content.classList.add("wi");
+    outer.appendChild(content);
+    return outer;
+  }
+  const inner = document.createElement("span");
+  inner.className = "wi";
+  inner.appendChild(content);
+  outer.appendChild(inner);
+  return outer;
 }
 
 function countUp(node, target, { duration = 1100, format = (value) => String(value) } = {}) {
@@ -161,32 +228,66 @@ function enhanceButtons(root = document) {
   });
 }
 
-function enableSpotlight(root = document) {
-  if (!finePointer()) return;
-  root.querySelectorAll(".spotlight:not([data-spot])").forEach((node) => {
-    node.dataset.spot = "1";
-    node.addEventListener("pointermove", (event) => {
-      const rect = node.getBoundingClientRect();
-      node.style.setProperty("--mx", `${event.clientX - rect.left}px`);
-      node.style.setProperty("--my", `${event.clientY - rect.top}px`);
-    });
-  });
-}
+function enableTouchLight(root = document, selector = "[data-light]", { tilt = 0 } = {}) {
+  if (prefersReducedMotion()) return;
+  const hover = finePointer();
 
-function enableTilt(root = document, selector = "[data-tilt]") {
-  if (!finePointer() || prefersReducedMotion()) return;
-  root.querySelectorAll(`${selector}:not([data-tilted])`).forEach((node) => {
-    node.dataset.tilted = "1";
-    node.addEventListener("pointermove", (event) => {
-      const rect = node.getBoundingClientRect();
-      const px = (event.clientX - rect.left) / rect.width - 0.5;
-      const py = (event.clientY - rect.top) / rect.height - 0.5;
-      node.style.setProperty("--tilt-x", `${(-py * 6).toFixed(2)}deg`);
-      node.style.setProperty("--tilt-y", `${(px * 8).toFixed(2)}deg`);
-    });
-    node.addEventListener("pointerleave", () => {
+  root.querySelectorAll(`${selector}:not([data-lit])`).forEach((node) => {
+    node.dataset.lit = "1";
+    const host = node.querySelector("[data-light-host]") ?? node;
+    if (!host.querySelector(":scope > .glare")) {
+      const glare = document.createElement("span");
+      glare.className = "glare";
+      glare.setAttribute("aria-hidden", "true");
+      host.appendChild(glare);
+    }
+
+    let frame = 0;
+    let pending = null;
+    let pressed = false;
+
+    const paint = () => {
+      frame = 0;
+      if (!pending) return;
+      const rect = host.getBoundingClientRect();
+      const x = pending.x - rect.left;
+      const y = pending.y - rect.top;
+      host.style.setProperty("--mx", `${x.toFixed(1)}px`);
+      host.style.setProperty("--my", `${y.toFixed(1)}px`);
+      if (tilt) {
+        const px = x / rect.width - 0.5;
+        const py = y / rect.height - 0.5;
+        node.style.setProperty("--tilt-x", `${(-py * tilt * 0.75).toFixed(2)}deg`);
+        node.style.setProperty("--tilt-y", `${(px * tilt).toFixed(2)}deg`);
+      }
+    };
+
+    const queue = (event) => {
+      pending = { x: event.clientX, y: event.clientY };
+      if (!frame) frame = requestAnimationFrame(paint);
+    };
+
+    const settle = () => {
+      pressed = false;
+      node.classList.remove("is-lit");
       node.style.setProperty("--tilt-x", "0deg");
       node.style.setProperty("--tilt-y", "0deg");
+    };
+
+    node.addEventListener("pointerdown", (event) => {
+      pressed = true;
+      queue(event);
+      node.classList.add("is-lit");
+    });
+    node.addEventListener("pointermove", (event) => {
+      if (!hover && !pressed) return;
+      queue(event);
+      if (hover) node.classList.add("is-lit");
+    });
+    node.addEventListener("pointerleave", settle);
+    node.addEventListener("pointercancel", settle);
+    node.addEventListener("pointerup", () => {
+      if (!hover) setTimeout(settle, 180);
     });
   });
 }
@@ -244,12 +345,12 @@ export {
   closeScrim,
   confirmSheet,
   countUp,
-  enableSpotlight,
-  enableTilt,
+  enableTouchLight,
   enhanceButtons,
   greeting,
   haptic,
   prefersReducedMotion,
+  splitReveal,
   syncSegmented,
   toast,
   trackScroll,

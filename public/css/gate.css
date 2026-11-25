@@ -10,19 +10,29 @@
 }
 
 .is-ready .seal {
-  animation: sealIn 1.1s var(--ease-spring) both;
+  animation: sealIn 1.6s var(--ease-silk) both;
 }
 
-.is-ready .gate__head {
-  animation: rise 0.9s 0.12s var(--ease-out) both;
+.is-ready .gate__eyebrow,
+.is-ready .gate__sub {
+  animation: rise 1.2s 0.5s var(--ease-silk) both;
+}
+
+.is-ready .gate__eyebrow {
+  animation-delay: 0.25s;
+}
+
+.is-ready .gate__title.split .wi {
+  animation: wordUp 1.4s var(--ease-silk) forwards;
+  animation-delay: calc(0.32s + var(--i, 0) * 0.12s);
 }
 
 .is-ready .gate__card {
-  animation: rise 0.9s 0.2s var(--ease-out) both;
+  animation: rise 1.3s 0.62s var(--ease-silk) both;
 }
 
 .is-ready .mascot {
-  animation: mascotIn 1s 0.55s var(--ease-spring) both;
+  animation: mascotIn 1.4s 1.1s var(--ease-silk) both;
 }
 
 .seal {
@@ -196,7 +206,7 @@
 @keyframes sealIn {
   from {
     opacity: 0;
-    transform: scale(0.7) rotate(-8deg);
+    transform: scale(0.82);
   }
   to {
     opacity: 1;
@@ -383,8 +393,8 @@
   transform: translateY(18px) scale(0.94);
   transform-origin: 50% 100%;
   transition:
-    opacity 0.35s var(--ease-out),
-    transform 0.55s var(--ease-spring);
+    opacity 0.6s var(--ease-silk),
+    transform 0.9s var(--ease-silk);
 }
 
 .mascot[data-mood="idle"] .mascot__img--idle,
@@ -409,7 +419,7 @@
 @keyframes mascotIn {
   from {
     opacity: 0;
-    transform: translateY(60px);
+    transform: translateY(46px);
   }
   to {
     opacity: 1;
@@ -423,7 +433,7 @@
     transform: translateY(0) rotate(0deg);
   }
   50% {
-    transform: translateY(-5px) rotate(-1.5deg);
+    transform: translateY(-6px) rotate(-1.2deg);
   }
 }
 
@@ -456,12 +466,22 @@
   z-index: 1;
   padding: 24px 20px 20px;
   border-radius: var(--r-xl);
-  background: linear-gradient(170deg, #1d1823, #0e0c12);
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-2);
-  transition:
-    border-color var(--t-med) var(--ease-out),
-    box-shadow var(--t-med) var(--ease-out);
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 95, 143, 0.09), transparent 70%),
+    linear-gradient(170deg, #1d1722, #0d0a11);
+  box-shadow: var(--shadow-2), 0 30px 90px -50px rgba(255, 95, 143, 0.5);
+}
+
+.gate__form::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 70px -24px rgba(99, 226, 181, 0.6);
+  opacity: 0;
+  transition: opacity var(--t-slow) var(--ease-silk);
 }
 
 .gate__label {
@@ -484,13 +504,43 @@
   height: 60px;
   padding: 0 6px 0 16px;
   margin-bottom: 14px;
-  border-radius: var(--r-md);
-  background: rgba(9, 7, 12, 0.78);
-  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: rgba(7, 5, 10, 0.72);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
   transition:
-    border-color var(--t-fast) var(--ease-out),
-    box-shadow var(--t-med) var(--ease-out),
-    background-color var(--t-med) var(--ease-out);
+    border-color var(--t-med) var(--ease-silk),
+    box-shadow var(--t-med) var(--ease-silk),
+    background-color var(--t-med) var(--ease-silk);
+}
+
+.gate__field::after {
+  content: "";
+  position: absolute;
+  inset: -14px -10px;
+  z-index: -1;
+  border-radius: 40px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 110, 170, 0.32), rgba(255, 174, 138, 0.1) 60%, transparent);
+  opacity: 0;
+}
+
+.gate__field.is-typing::after {
+  animation: keyGlow 0.9s var(--ease-silk);
+}
+
+@keyframes keyGlow {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
 }
 
 .gate__field::before {
@@ -508,13 +558,13 @@
     linear-gradient(#000 0 0) content-box exclude,
     linear-gradient(#000 0 0);
   opacity: 0;
-  transition: opacity var(--t-med) var(--ease-out);
+  transition: opacity var(--t-slow) var(--ease-silk);
   pointer-events: none;
 }
 
 .gate__field:focus-within {
   border-color: transparent;
-  box-shadow: 0 0 0 5px var(--accent-soft), 0 0 44px -10px rgba(255, 95, 143, 0.5);
+  box-shadow: 0 0 0 6px rgba(255, 95, 143, 0.08), 0 0 50px -12px rgba(255, 95, 143, 0.55);
 }
 
 .gate__field:focus-within::before {
@@ -576,15 +626,16 @@
   height: 44px;
   padding: 0 14px;
   border-radius: var(--r-sm);
+  border-radius: 14px;
   background: rgba(255, 240, 230, 0.07);
-  border: 1px solid var(--line);
+  box-shadow: var(--rim);
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 650;
   color: var(--text-dim);
   transition:
-    background-color var(--t-fast) var(--ease-out),
-    color var(--t-fast) var(--ease-out),
-    transform var(--t-med) var(--ease-spring);
+    background-color var(--t-med) var(--ease-silk),
+    color var(--t-med) var(--ease-silk),
+    transform var(--t-med) var(--ease-silk);
 }
 
 .gate__paste:hover {
@@ -664,20 +715,19 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 16px;
-  border-radius: var(--r-md);
-  background: rgba(255, 240, 230, 0.028);
-  border: 1px solid var(--line);
+  padding: 18px 16px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(160deg, rgba(34, 26, 40, 0.62), rgba(16, 12, 20, 0.72));
+  box-shadow: var(--rim);
   transition:
-    border-color var(--t-med) var(--ease-out),
-    background-color var(--t-med) var(--ease-out),
-    transform var(--t-med) var(--ease-out);
+    background-color var(--t-slow) var(--ease-silk),
+    transform var(--t-slow) var(--ease-silk);
 }
 
-.gate__trust-item:hover {
-  border-color: var(--line-strong);
-  background: rgba(255, 240, 230, 0.05);
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .gate__trust-item:hover {
+    transform: translateY(-3px);
+  }
 }
 
 .gate__trust-item strong {
@@ -700,9 +750,9 @@
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: var(--r-sm);
-  background: linear-gradient(145deg, rgba(255, 95, 143, 0.18), rgba(255, 174, 138, 0.06));
-  border: 1px solid rgba(255, 132, 150, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 95, 143, 0.2), rgba(255, 174, 138, 0.05));
+  box-shadow: inset 0 1px 0 rgba(255, 230, 235, 0.14);
   color: var(--peach);
   font-size: 18px;
 }
@@ -713,9 +763,8 @@
   animation: handoff 0.9s 1.1s var(--ease-in-out) forwards;
 }
 
-.gate--success .gate__form {
-  border-color: rgba(99, 226, 181, 0.4);
-  box-shadow: var(--shadow-2), 0 0 60px -20px rgba(99, 226, 181, 0.55);
+.gate--success .gate__form::after {
+  opacity: 1;
 }
 
 @keyframes handoff {

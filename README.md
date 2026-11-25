@@ -81,10 +81,15 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 ## Tests
 
 ```bash
-npm run test:e2e        # 212 API and security checks against a temporary MongoDB
+npm run test:e2e        # 239 API and security checks against a temporary MongoDB
 npm run test:browser    # 135 checks driving real Chromium, including video playback
 npm run screenshots     # writes screenshots/ for a visual pass
+npm run perf            # frame timing on a throttled phone-sized screen
 ```
+
+`npm run perf` measures the unlock animation on a 390×844 screen at 3× pixel density. Set
+`CPU_SLOWDOWN=6` to slow the CPU like a budget phone, and `SCENARIO=touch` to measure a finger
+dragging across the gate instead.
 
 Both suites start their own MongoDB and server, so nothing needs to be running first.
 
@@ -277,7 +282,7 @@ src/
 public/
   index.html watch.html admin.html
   css/   theme.css (tokens, shared) + gate, app, admin
-  js/    api, gate, app, player, presence, admin
+  js/    api, gate, app, player, presence, admin, silk (WebGL background)
   fonts/ self-hosted Bricolage Grotesque + Instrument Sans
 tests/
   e2e.mjs        API and security
@@ -298,7 +303,38 @@ The direction is editorial and nocturnal, closer to a fashion magazine than a da
 A high-contrast serif italic next to a plain sans is a standard editorial pairing: the two never
 compete because their roles are obvious. All three are variable WOFF2 files under the SIL Open
 Font License, self-hosted so no third party sees your traffic. Colour runs from rose through peach to champagne over a violet-black background with
-a slow aurora and a faint film grain.
+a faint film grain.
+
+### Softness and motion
+
+The goal is for the site to feel soft and to move smoothly, never snapping or bouncing.
+
+- **Living silk background.** Behind the gate and the member pages, a WebGL shader draws slow
+  folds of plum and rose light, like silk in a breeze. It follows your finger: touching the
+  screen warms the cloth under it, each tap sends a ripple through it, and scrolling shifts the
+  folds. A correct key makes the whole cloth bloom pink from the seal, and that glow fades out as
+  the home page arrives.
+- **Cheap to draw.** The shader renders at one fifth of the screen size (one seventh on phones with
+  four cores or fewer) and the browser scales it up. Soft folds look the same at that size. It draws at
+  30 fps when idle, 60 fps while you touch or scroll, and stops when the tab is hidden. If WebGL is
+  missing it falls back to a CSS gradient, and with reduced motion it draws a single still frame.
+  Nothing glassy sits on top of it, because `backdrop-filter` over a moving background would have
+  to re-blur every frame.
+- **Soft surfaces.** Hard 1px borders became faint inner highlights, corners are rounder, and
+  headings dropped from weight 800 to 600–650. The last word of the tier name is set in the
+  Bodoni italic with the gradient, as in *Premium Collection*.
+- **Words rise into place.** Headlines reveal word by word from behind a mask.
+- **Cards morph into pages.** Tapping an archive card stretches its thumbnail mosaic into the
+  archive's header and slides its title into the page heading. Tapping a video stretches its
+  thumbnail into the player. This uses shared-element View Transitions. Browsers without them
+  get a crossfade.
+- **Touch light.** Pressing a card lights a soft glow under your finger. Archive cards also tilt
+  toward it.
+- **One curve.** Most motion uses one long ease-out curve (`--ease-silk`) with longer timings, so
+  things glide to a stop instead of overshooting.
+
+On a 390×844 screen with the CPU slowed 6×, the unlock sequence and finger dragging both hold
+59–60 fps with no janky frames.
 
 ### Interaction
 
@@ -315,7 +351,8 @@ a slow aurora and a faint film grain.
 - **Wrong key:** the card and seal shake with a haptic buzz, and when a viewer is signed out, the
   gate explains why.
 - **Home:** a time-of-day greeting, a character cut-out behind the hero with a slow parallax on
-  scroll, stat chips, and archive cards built from a mosaic of the three most-watched thumbnails. On desktop the cards tilt and light up under the pointer.
+  scroll, stat chips, and archive cards built from a mosaic of the three most-watched thumbnails.
+  The whole card is tappable.
 - **Archive:** a sticky search that jumps straight to a number (`#42` or `42`) or matches titles,
   a sort control whose highlight slides between options, and infinite scroll.
 - **Player:** an ambient glow taken from the thumbnail, a "Resuming from 3:12" chip, a burst

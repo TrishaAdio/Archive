@@ -12,7 +12,8 @@
     "secrets": "node scripts/generate-secrets.mjs",
     "test:e2e": "node tests/e2e.mjs",
     "test:browser": "node tests/browser.mjs",
-    "screenshots": "node tests/screenshots.mjs"
+    "screenshots": "node tests/screenshots.mjs",
+    "perf": "node tests/perf-unlock.mjs"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
