@@ -428,8 +428,16 @@ async function main() {
     check("video metadata decoded", metadata.duration > 0 && metadata.width > 0, JSON.stringify(metadata));
     check("no media error reported", metadata.error === null, `error code ${metadata.error}`);
 
-    await page.locator("#player-video").evaluate((video) => video.play());
+    check("native browser controls are off", !(await page.locator("#player-video").evaluate((video) => video.controls)));
+    check("custom control bar is drawn", await page.locator("#pc-seek").isVisible());
+    check("duration shown in the custom bar", (await page.locator("#pc-duration").textContent()) !== "0:00");
+
+    await page.click("#pc-play");
     await page.waitForFunction(() => document.getElementById("player-video").currentTime > 0.6, { timeout: 20000 });
+    check("our play button starts playback", true);
+    check("play button switches to pause", (await page.locator("#player-controls").getAttribute("data-state")) === "playing");
+    const seekFill = await page.locator("#pc-played").evaluate((node) => node.style.transform);
+    check("seek bar fills as the video plays", /scaleX\(0\.[1-9]|scaleX\(1/.test(seekFill), seekFill);
     const playedTo = await page.locator("#player-video").evaluate((video) => video.currentTime);
     check("video genuinely plays through the protected stream", playedTo > 0.6, `reached ${playedTo.toFixed(2)}s`);
 
@@ -475,6 +483,24 @@ async function main() {
       return home.continueWatching;
     });
     check("progress persisted to the database", savedProgress.length === 1, JSON.stringify(savedProgress));
+
+    section("Back to the archive without reloading");
+    await page.click("#nav-back");
+    await page.waitForSelector("#view-archive:not([hidden])", { timeout: 6000 });
+    const afterBack = await page.evaluate(() => ({
+      skeletons: document.querySelectorAll("#video-grid .skeleton").length,
+      cards: document.querySelectorAll("#video-grid .vcard").length,
+      videoSrc: document.getElementById("player-video").getAttribute("src"),
+    }));
+    check("archive grid comes back instantly with no loading skeletons", afterBack.skeletons === 0 && afterBack.cards === 9, JSON.stringify(afterBack));
+    check("leaving the player stops the stream", !afterBack.videoSrc, JSON.stringify(afterBack));
+    await page.waitForFunction(
+      () => document.querySelector('#video-grid [data-video] .vcard__meta')?.textContent.includes("1 view"),
+      { timeout: 6000 },
+    ).then(
+      () => check("view counts refresh quietly after coming back", true),
+      () => check("view counts refresh quietly after coming back", false),
+    );
 
     await page.goto(`${BASE}/watch`, { waitUntil: "networkidle" });
     await page.waitForSelector("#resume-section:not([hidden])", { timeout: 10000 });

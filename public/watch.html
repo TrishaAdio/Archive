@@ -43,6 +43,7 @@
           <h1 class="hero__title" id="hero-title">Loading</h1>
           <p class="hero__sub" id="hero-sub"></p>
           <div class="hero__chips" id="hero-chips"></div>
+          <div class="hero__actions" id="hero-actions" hidden></div>
         </div>
 
         <div class="block" id="resume-section" hidden>
@@ -129,13 +130,99 @@
                 class="player__video"
                 id="player-video"
                 playsinline
-                controls
                 preload="auto"
-                controlslist="nodownload noremoteplayback"
+                controlslist="nodownload noremoteplayback nofullscreen"
                 disablepictureinpicture
+                disableremoteplayback
               ></video>
               <div class="player__watermark" id="player-watermark" aria-hidden="true"></div>
-              <div class="player__spinner" id="player-spinner"><div class="spinner"></div></div>
+              <div class="player__spinner" id="player-spinner" hidden><div class="spinner"></div></div>
+
+              <div class="pc" id="player-controls" data-state="paused">
+                <button class="pc__surface" id="pc-surface" type="button" tabindex="-1" aria-hidden="true"></button>
+                <span class="pc__flash pc__flash--back" id="pc-flash-back" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" focusable="false"><path d="M11 6 5 12l6 6M18 6l-6 6 6 6" /></svg>
+                  10 sec
+                </span>
+                <span class="pc__flash pc__flash--forward" id="pc-flash-forward" aria-hidden="true">
+                  10 sec
+                  <svg class="icon" viewBox="0 0 24 24" focusable="false"><path d="m13 6 6 6-6 6M6 6l6 6-6 6" /></svg>
+                </span>
+                <div class="pc__shade" aria-hidden="true"></div>
+
+                <div class="pc__center">
+                  <button class="pc__btn pc__btn--skip" id="pc-back" type="button" aria-label="Back 10 seconds">
+                    <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                      <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
+                      <path d="M4 4.2v3.6h3.6" />
+                      <text x="12" y="15.2" text-anchor="middle">10</text>
+                    </svg>
+                  </button>
+                  <button class="pc__btn pc__btn--play" id="pc-play" type="button" aria-label="Play">
+                    <svg class="icon pc__icon-play" viewBox="0 0 24 24" focusable="false">
+                      <path d="M8.2 5.6c0-1 1.1-1.6 1.9-1.1l9 6.4c.7.5.7 1.6 0 2.1l-9 6.4c-.8.6-1.9 0-1.9-1z" />
+                    </svg>
+                    <svg class="icon pc__icon-pause" viewBox="0 0 24 24" focusable="false">
+                      <rect x="6.5" y="5" width="3.6" height="14" rx="1.6" />
+                      <rect x="13.9" y="5" width="3.6" height="14" rx="1.6" />
+                    </svg>
+                    <svg class="icon pc__icon-replay" viewBox="0 0 24 24" focusable="false">
+                      <path d="M5 12a7 7 0 1 0 2.1-5" />
+                      <path d="M4.5 4v4h4" />
+                    </svg>
+                  </button>
+                  <button class="pc__btn pc__btn--skip" id="pc-forward" type="button" aria-label="Forward 10 seconds">
+                    <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                      <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+                      <path d="M20 4.2v3.6h-3.6" />
+                      <text x="12" y="15.2" text-anchor="middle">10</text>
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="pc__bar">
+                  <div
+                    class="pc__seek"
+                    id="pc-seek"
+                    role="slider"
+                    tabindex="0"
+                    aria-label="Seek"
+                    aria-valuemin="0"
+                    aria-valuemax="0"
+                    aria-valuenow="0"
+                  >
+                    <span class="pc__track">
+                      <span class="pc__buffered" id="pc-buffered"></span>
+                      <span class="pc__played" id="pc-played"></span>
+                    </span>
+                    <span class="pc__knob" id="pc-knob"></span>
+                    <span class="pc__bubble mono" id="pc-bubble" aria-hidden="true">0:00</span>
+                  </div>
+                  <div class="pc__row">
+                    <span class="pc__time mono"><span id="pc-current">0:00</span><span class="pc__sep">/</span><span id="pc-duration">0:00</span></span>
+                    <span class="pc__spacer"></span>
+                    <button class="pc__btn pc__btn--text mono" id="pc-speed" type="button" aria-label="Playback speed 1 times">1×</button>
+                    <button class="pc__btn" id="pc-mute" type="button" aria-label="Mute">
+                      <svg class="icon pc__icon-sound" viewBox="0 0 24 24" focusable="false">
+                        <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
+                        <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+                      </svg>
+                      <svg class="icon pc__icon-muted" viewBox="0 0 24 24" focusable="false">
+                        <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
+                        <path d="m16 9.5 5 5M21 9.5l-5 5" />
+                      </svg>
+                    </button>
+                    <button class="pc__btn" id="pc-full" type="button" aria-label="Full screen">
+                      <svg class="icon pc__icon-expand" viewBox="0 0 24 24" focusable="false">
+                        <path d="M4.5 9V5.8c0-.7.6-1.3 1.3-1.3H9M15 4.5h3.2c.7 0 1.3.6 1.3 1.3V9M19.5 15v3.2c0 .7-.6 1.3-1.3 1.3H15M9 19.5H5.8c-.7 0-1.3-.6-1.3-1.3V15" />
+                      </svg>
+                      <svg class="icon pc__icon-shrink" viewBox="0 0 24 24" focusable="false">
+                        <path d="M9 4.5v3.2c0 .7-.6 1.3-1.3 1.3H4.5M19.5 9h-3.2c-.7 0-1.3-.6-1.3-1.3V4.5M15 19.5v-3.2c0-.7.6-1.3 1.3-1.3h3.2M4.5 15h3.2c.7 0 1.3.6 1.3 1.3v3.2" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div class="player__chip" id="player-resume" role="status" hidden></div>
 
               <div class="upnext" id="upnext-overlay" hidden>

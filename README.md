@@ -82,7 +82,7 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 
 ```bash
 npm run test:e2e        # 239 API and security checks against a temporary MongoDB
-npm run test:browser    # 135 checks driving real Chromium, including video playback
+npm run test:browser    # 144 checks driving real Chromium, including video playback
 npm run screenshots     # writes screenshots/ for a visual pass
 npm run perf            # frame timing on a throttled phone-sized screen
 ```
@@ -142,6 +142,18 @@ home page shows a "Pick up where you left off" row for anything started but not 
 The default ordering inside an archive is most-watched first, then by number. Views are counted
 once per key per video per `VIEW_DEDUPE_HOURS`, so replays do not inflate the count. Likes are
 one per key per video and toggle off.
+
+### The player
+
+The video uses the site's own controls (`public/js/controls.js`) instead of the browser's, so
+it looks the same on every phone and never shows a download button. Tap once to show or hide
+the controls, double-tap the left or right side to skip 10 seconds, and use the speed button
+for 1×, 1.25×, 1.5× or 2×. On a keyboard: space or `k` plays, `j`/`l` skip 10 seconds, the
+arrows skip 5 seconds, `m` mutes and `f` goes fullscreen. The loading spinner only appears if
+a load takes longer than 450 ms, so short waits do not flash it.
+
+Pressing back from a video returns to the archive you came from at the same scroll position.
+The grid is kept in memory, so nothing reloads. View and like counts refresh in the background.
 
 ### Live viewers and broadcasts
 
