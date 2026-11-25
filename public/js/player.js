@@ -1,8 +1,10 @@
 import { api, ApiError } from "./api.js";
+import { createControls } from "./controls.js";
 
 const PROGRESS_INTERVAL_MS = 10000;
 const TOKEN_REFRESH_RATIO = 0.55;
 const WATERMARK_MOVE_MS = 23000;
+const SPINNER_DELAY_MS = 450;
 
 function formatClock(seconds) {
   const total = Math.max(0, Math.round(seconds));
@@ -18,7 +20,9 @@ function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume =
   const spinner = document.getElementById("player-spinner");
   const watermark = document.getElementById("player-watermark");
   const resumeChip = document.getElementById("player-resume");
+  const controls = createControls({ video, stage, onUserSeek: () => onUserResume() });
   let chipTimer = null;
+  let spinnerTimer = null;
 
   function showChip(text) {
     clearTimeout(chipTimer);
@@ -40,7 +44,15 @@ function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume =
   let recovering = false;
 
   function setSpinner(visible) {
-    spinner.hidden = !visible;
+    clearTimeout(spinnerTimer);
+    stage.classList.toggle("is-buffering", visible);
+    if (!visible) {
+      spinner.hidden = true;
+      return;
+    }
+    spinnerTimer = setTimeout(() => {
+      spinner.hidden = false;
+    }, SPINNER_DELAY_MS);
   }
 
   function tokenIsStale() {
@@ -175,6 +187,11 @@ function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume =
     }
   }
 
+  function pause() {
+    if (!video.paused) video.pause();
+    controls.hideForLeave();
+  }
+
   function teardown() {
     clearInterval(progressTimer);
     clearInterval(watermarkTimer);
@@ -194,6 +211,7 @@ function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume =
     current = null;
     token = null;
     setSpinner(false);
+    controls.reset();
   }
 
   video.addEventListener("waiting", () => setSpinner(true));
@@ -227,7 +245,7 @@ function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume =
 
   window.addEventListener("pagehide", () => saveProgress({ keepalive: true }));
 
-  return { load, teardown };
+  return { load, pause, teardown };
 }
 
 export { createPlayer };

@@ -91,7 +91,7 @@ function confirmSheet({ title, message, confirmLabel = "Confirm", cancelLabel = 
   });
 }
 
-function onScreen(node) {
+function isOnScreen(node) {
   if (!node?.isConnected) return false;
   const rect = node.getBoundingClientRect();
   return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
@@ -103,8 +103,9 @@ function withViewTransition(update, morphs = []) {
     return Promise.resolve();
   }
 
-  const pairs = morphs.filter((pair) => onScreen(pair.from));
+  const pairs = morphs.filter((pair) => isOnScreen(pair.from));
   pairs.forEach((pair) => (pair.from.style.viewTransitionName = pair.name));
+  document.documentElement.classList.toggle("is-morphing", pairs.length > 0);
 
   const transition = document.startViewTransition(() => {
     pairs.forEach((pair) => (pair.from.style.viewTransitionName = ""));
@@ -118,6 +119,7 @@ function withViewTransition(update, morphs = []) {
   });
 
   const cleanUp = () => {
+    document.documentElement.classList.remove("is-morphing");
     pairs.forEach((pair) => {
       pair.from.style.viewTransitionName = "";
       if (pair.target) pair.target.style.viewTransitionName = "";
@@ -228,9 +230,10 @@ function enhanceButtons(root = document) {
   });
 }
 
-function enableTouchLight(root = document, selector = "[data-light]", { tilt = 0 } = {}) {
+function enableTouchLight(root = document, selector = "[data-light]", { tilt: tiltAmount = 0 } = {}) {
   if (prefersReducedMotion()) return;
   const hover = finePointer();
+  const tilt = hover ? tiltAmount : 0;
 
   root.querySelectorAll(`${selector}:not([data-lit])`).forEach((node) => {
     node.dataset.lit = "1";
@@ -349,6 +352,7 @@ export {
   enhanceButtons,
   greeting,
   haptic,
+  isOnScreen,
   prefersReducedMotion,
   splitReveal,
   syncSegmented,

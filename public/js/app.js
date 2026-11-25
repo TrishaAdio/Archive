@@ -16,6 +16,7 @@ import {
   enableTouchLight,
   enhanceButtons,
   greeting,
+  isOnScreen,
   haptic,
   prefersReducedMotion,
   splitReveal,
@@ -59,6 +60,10 @@ const state = {
   loading: false,
   requestId: 0,
   currentView: "home",
+  gridArchive: null,
+  gridKey: null,
+  archiveScroll: 0,
+  playingId: null,
 };
 
 function leaveToGate(message) {
@@ -66,16 +71,20 @@ function leaveToGate(message) {
   window.location.replace(target);
 }
 
-function showView(name, morphs = []) {
+function showView(name, morphs = [], { scrollTop = 0 } = {}) {
   const changed = state.currentView !== name;
+  const leavingPlayer = state.currentView === "player" && name !== "player";
+  if (state.currentView === "archive" && changed) state.archiveScroll = window.scrollY;
   state.currentView = name;
+  if (leavingPlayer) player.pause();
 
   const apply = () => {
+    if (leavingPlayer) player.teardown();
     Object.entries(views).forEach(([key, node]) => {
       node.hidden = key !== name;
     });
     navBack.hidden = name === "home";
-    if (changed) window.scrollTo({ top: 0, behavior: "instant" });
+    if (changed) window.scrollTo({ top: scrollTop, behavior: "instant" });
     if (name === "archive") syncSegmented(sortControl, { instant: changed });
   };
 
@@ -184,7 +193,6 @@ function openVideoCard(id, card) {
 }
 
 async function openHome({ push = true } = {}) {
-  player.teardown();
   showView("home");
   if (push) pushUrl("");
 
@@ -200,7 +208,7 @@ async function openHome({ push = true } = {}) {
     state.archives = home.archives;
 
     renderPlan(home.viewer, home.category);
-    renderHero(home.category, home.archives, home.viewer);
+    renderHero(home.category, home.archives, home.viewer, home.continueWatching);
     renderResume(home.continueWatching);
     renderArchives(home.archives);
   } catch (error) {
@@ -272,7 +280,7 @@ function trackHeroParallax() {
   );
 }
 
-function renderHero(category, archives, viewer) {
+function renderHero(category, archives, viewer, resume = []) {
   revealHeroCast();
   const videoTotal = archives.reduce((sum, archive) => sum + archive.videoCount, 0);
   const remaining = Math.max(0, daysLeft(viewer.planExpiresAt) ?? 0);
@@ -288,6 +296,32 @@ function renderHero(category, archives, viewer) {
     <span class="chip">${icon("layers")}<strong>${formatCount(videoTotal)}</strong> videos</span>
     <span class="chip">${icon("calendar")}<strong>${remaining}</strong> ${remaining === 1 ? "day" : "days"} left</span>
     <span class="chip">${icon("lock")} Network-locked</span>`;
+
+  renderHeroAction(archives, resume);
+}
+
+function renderHeroAction(archives, resume) {
+  const host = document.getElementById("hero-actions");
+  const next = resume.find((video) => video.playable) ?? null;
+  const first = archives.find((archive) => archive.videoCount > 0) ?? null;
+  if (!next && !first) {
+    host.hidden = true;
+    return;
+  }
+
+  host.hidden = false;
+  host.innerHTML = next
+    ? `<button class="btn btn--primary hero__cta" type="button">${icon("play", { solid: true })} Continue #${next.number}</button>
+       <span class="hero__cta-note">${escapeHtml(next.title)}</span>`
+    : `<button class="btn btn--primary hero__cta" type="button">${icon("play", { solid: true })} Start watching</button>
+       <span class="hero__cta-note">${escapeHtml(first.name)}</span>`;
+
+  host.querySelector("button").addEventListener("click", () => {
+    haptic(10);
+    if (next) openPlayer(next.id);
+    else openArchive(first.id, { query: "" });
+  });
+  enhanceButtons(host);
 }
 
 function renderHeroTitle(name) {
@@ -379,39 +413,53 @@ function archiveCoverIsCurrent() {
   return document.getElementById("archive-cover").dataset.for === state.archive;
 }
 
+function gridKey(archiveId, sort, query) {
+  return `${archiveId}|${sort}|${query}`;
+}
+
+function playerMorphs() {
+  const card = () => {
+    const node = state.playingId ? document.querySelector(`#video-grid [data-video="${CSS.escape(state.playingId)}"]`) : null;
+    return node && isOnScreen(node) ? node : null;
+  };
+  return [
+    { from: document.getElementById("player-stage"), name: "morph-media", to: () => card()?.querySelector(".thumb") },
+    { from: document.getElementById("player-title"), name: "morph-title", to: () => card()?.querySelector(".vcard__title") },
+  ];
+}
+
 async function openArchive(archiveId, { push = true, sort, query, from } = {}) {
-  player.teardown();
+  const fromPlayer = state.currentView === "player";
+  const sameArchive = state.gridArchive === archiveId;
+  const nextSort = sort ?? state.sort;
+  const nextQuery = query !== undefined ? query : sameArchive ? state.query : "";
+  const reuse =
+    sameArchive && state.gridKey === gridKey(archiveId, nextSort, nextQuery) && state.videos.length > 0 && !state.loading;
   const known = state.archives.find((archive) => archive.id === archiveId);
-  const changedArchive = state.archive !== archiveId;
-  if (known && (changedArchive || !archiveCoverIsCurrent())) {
-    state.archive = archiveId;
+
+  state.archive = archiveId;
+  state.sort = nextSort;
+  state.query = nextQuery;
+  searchInput.value = nextQuery;
+  searchClear.hidden = !nextQuery;
+
+  if (!reuse && known) {
     document.getElementById("archive-title").textContent = known.name;
     document.getElementById("archive-sub").textContent = plural(known.videoCount, "video");
     renderArchiveCover(known.coverVideoIds);
   }
 
-  showView(
-    "archive",
-    cardMorphs(from, [
-      [".acard__covers", "morph-media", "archive-cover"],
-      [".acard__title", "morph-title", "archive-title"],
-    ]),
-  );
+  const morphs = from
+    ? cardMorphs(from, [
+        [".acard__covers", "morph-media", "archive-cover"],
+        [".acard__title", "morph-title", "archive-title"],
+      ])
+    : fromPlayer && reuse
+      ? playerMorphs()
+      : [];
+
+  showView("archive", morphs, { scrollTop: fromPlayer && reuse ? state.archiveScroll : 0 });
   if (push) pushUrl(`a=${encodeURIComponent(archiveId)}`);
-
-  if (changedArchive) {
-    state.query = "";
-    searchInput.value = "";
-  }
-  if (query !== undefined) {
-    state.query = query;
-    searchInput.value = query;
-  }
-  searchClear.hidden = !state.query;
-
-  state.archive = archiveId;
-  state.sort = sort ?? state.sort;
-  state.videos = [];
 
   sortControl.querySelectorAll(".sort").forEach((node) => {
     const active = node.dataset.sort === state.sort;
@@ -420,10 +468,38 @@ async function openArchive(archiveId, { push = true, sort, query, from } = {}) {
   });
   syncSegmented(sortControl);
 
+  if (reuse) {
+    refreshCardStats();
+    return;
+  }
+
+  state.videos = [];
   const grid = document.getElementById("video-grid");
   grid.innerHTML = Array.from({ length: 6 }, () => '<div class="skeleton video-skeleton"></div>').join("");
 
   await loadVideoPage({ replace: true });
+}
+
+async function refreshCardStats() {
+  const params = new URLSearchParams({ sort: state.sort, skip: "0", limit: String(Math.min(96, state.videos.length)) });
+  if (state.query) params.set("q", state.query);
+  try {
+    const page = await api.get(`/api/archives/${state.archive}/videos?${params}`);
+    page.videos.forEach((video) => {
+      const card = document.querySelector(`#video-grid [data-video="${CSS.escape(video.id)}"]`);
+      if (!card) return;
+      const fresh = document.createElement("template");
+      fresh.innerHTML = videoCardMarkup(video).trim();
+      const next = fresh.content.firstElementChild;
+      card.querySelector(".vcard__meta").replaceWith(next.querySelector(".vcard__meta"));
+      card.querySelector(".thumb__progress")?.remove();
+      const progress = next.querySelector(".thumb__progress");
+      if (progress) card.querySelector(".thumb__number").after(progress);
+    });
+    applyProgressWidths(document.getElementById("video-grid"));
+  } catch (error) {
+    handleAuthError(error);
+  }
 }
 
 async function loadVideoPage({ replace = false } = {}) {
@@ -445,6 +521,8 @@ async function loadVideoPage({ replace = false } = {}) {
 
     state.total = page.total;
     state.videos = replace ? page.videos : [...state.videos, ...page.videos];
+    state.gridArchive = state.archive;
+    state.gridKey = gridKey(state.archive, state.sort, state.query);
 
     document.getElementById("archive-title").textContent = page.archive.name;
     if (!archiveCoverIsCurrent() && page.videos.length) renderArchiveCover(page.videos.map((video) => video.id));
@@ -523,7 +601,8 @@ function cancelUpNext() {
 
 async function openPlayer(videoId, { push = true, from } = {}) {
   cancelUpNext();
-  player.teardown();
+  if (state.currentView === "player") player.teardown();
+  state.playingId = videoId;
 
   const playerVideo = document.getElementById("player-video");
   playerVideo.poster = thumbUrl(videoId);
