@@ -91,8 +91,9 @@ npm run perf            # frame timing on a throttled phone-sized screen
 `npm run perf` measures the unlock animation on a 390×844 screen at 3× pixel density. Set
 `CPU_SLOWDOWN=6` to slow the CPU like a budget phone. `SCENARIO=touch` measures a finger
 dragging across the gate, `SCENARIO=open` measures opening a video from an archive, and
-`SCENARIO=back` measures going back from a playing video to the archive. `SHOW_FRAMES=1` prints
-every frame time.
+`SCENARIO=back` measures going back from a playing video to the archive. `scroll-home`,
+`scroll-archive`, `archive-open` and `sheet` measure flick-scrolling, opening an archive and the
+menu sheet. `SHOW_FRAMES=1` prints every frame time.
 
 Every suite starts its own MongoDB and server, so nothing needs to be running first. The
 Telegram, browser and screenshot runs never contact Telegram. They set `TELEGRAM_DRIVER_MODULE`
@@ -386,17 +387,32 @@ The goal is for the site to feel soft and to move smoothly, never snapping or bo
   headings dropped from weight 800 to 600–650. The last word of the tier name is set in the
   Bodoni italic with the gradient, as in *Premium Collection*.
 - **Words rise into place.** Headlines reveal word by word from behind a mask.
-- **Cards morph into pages.** Tapping an archive card stretches its thumbnail mosaic into the
-  archive's header and slides its title into the page heading. Tapping a video stretches its
-  thumbnail into the player. This uses shared-element View Transitions. Browsers without them
-  get a crossfade.
+- **Cards glide into pages.** Tapping an archive card lifts its thumbnail mosaic and flies it
+  into the archive's header. Tapping a video flies its thumbnail into the player, and going back
+  flies the player down into its card in the grid. The flying copy moves with `transform` and
+  `opacity` only (`glide()` in `public/js/ui.js`), so the phone's compositor runs it without
+  waiting for JavaScript. The browser's View Transitions API is not used. It snapshots the whole
+  page and resizes on the main thread, which dropped frames on phones.
 - **Touch light.** Pressing a card lights a soft glow under your finger. Archive cards also tilt
   toward it.
 - **One curve.** Most motion uses one long ease-out curve (`--ease-silk`) with longer timings, so
   things glide to a stop instead of overshooting.
 
-On a 390×844 screen with the CPU slowed 6×, the unlock sequence and finger dragging both hold
-59–60 fps with no janky frames.
+Page changes, scrolling effects and tap feedback move only `transform` and `opacity`, and
+nothing uses `backdrop-filter`. Two small exceptions remain: the sort control's highlight
+animates its width, and the plan ring animates its stroke. Shadow changes on hover only happen
+with a mouse. The silk background pauses while a page glides.
+
+On a 390×844 screen with the CPU slowed 6×:
+
+| Interaction | fps |
+|---|---|
+| Unlock sequence | 59 |
+| Flick-scrolling home or a 36-video archive | 60 |
+| Opening a video | 58 |
+| Going back to the archive | 57 |
+| Opening an archive | 56 |
+| Opening the menu sheet | 57 |
 
 ### Interaction
 
@@ -425,7 +441,7 @@ On a 390×844 screen with the CPU slowed 6×, the unlock sequence and finger dra
 - **Owner console:** stat values that count up, styled confirmation sheets instead of browser
   dialogs, toasts for every action, clickable folder breadcrumbs, and one-tap plan presets.
 
-View changes use the View Transitions API where the browser supports it. Primary buttons pull
+Views without a card to fly from rise and fade in. Primary buttons pull
 toward the pointer and ripple on press. Every animation sits behind a `prefers-reduced-motion`
 guard and collapses to near-zero duration for people who ask for less motion.
 

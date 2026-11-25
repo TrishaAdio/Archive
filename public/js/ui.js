@@ -97,44 +97,131 @@ function isOnScreen(node) {
   return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
 }
 
+const GLIDE_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+const GLIDE_MS = 820;
+const VIEW_SETTLE_MS = 560;
+const HANDOFF_AT = 0.7;
+
 let transitionSettled = Promise.resolve();
+let transitionToken = 0;
+let liveAnimations = [];
 
 function afterTransition() {
   return transitionSettled;
 }
 
-function withViewTransition(update, morphs = []) {
-  if (!document.startViewTransition || prefersReducedMotion()) {
+function cloneForGlide(node) {
+  const copy = node.cloneNode(true);
+  copy.removeAttribute("id");
+  copy.removeAttribute("style");
+  copy.removeAttribute("data-light-host");
+  copy.querySelectorAll("[id]").forEach((child) => child.removeAttribute("id"));
+  copy.querySelectorAll(".glare, video, .thumb__duration").forEach((child) => child.remove());
+  copy.querySelectorAll("img").forEach((image) => {
+    image.loading = "eager";
+    image.decoding = "sync";
+  });
+  return copy;
+}
+
+function placeGhost(copy, rect, radius) {
+  const ghost = document.createElement("div");
+  ghost.className = "glide-ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.height = `${rect.height}px`;
+  ghost.style.borderRadius = radius;
+  ghost.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
+  copy.style.borderRadius = radius;
+  ghost.appendChild(copy);
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+function cardRadius(node) {
+  if (parseFloat(radiusOf(node)) > 0) return radiusOf(node);
+  const card = node.closest(".acard, .vcard");
+  return card ? radiusOf(card) : "0px";
+}
+
+function placeAt(rect, base) {
+  return `translate3d(${rect.left}px, ${rect.top}px, 0) scale(${rect.width / base.width})`;
+}
+
+function radiusOf(node) {
+  return getComputedStyle(node).borderTopLeftRadius;
+}
+
+function stopGlides() {
+  liveAnimations.forEach((animation) => animation.cancel());
+  liveAnimations = [];
+  document.querySelectorAll(".glide-ghost").forEach((node) => node.remove());
+}
+
+function fly({ ghost, target, fromRect, toRect, base }) {
+  const timing = { duration: GLIDE_MS, easing: GLIDE_EASE, fill: "both" };
+  const handoff = { duration: GLIDE_MS, easing: "linear", fill: "both" };
+  const flight = ghost.animate([{ transform: placeAt(fromRect, base) }, { transform: placeAt(toRect, base) }], timing);
+  const ghostFade = ghost.animate([{ opacity: 1 }, { opacity: 1, offset: HANDOFF_AT }, { opacity: 0 }], handoff);
+  const reveal = target.animate([{ opacity: 0 }, { opacity: 0, offset: HANDOFF_AT }, { opacity: 1 }], handoff);
+  liveAnimations.push(flight, ghostFade, reveal);
+  return flight.finished.catch(() => null);
+}
+
+function fadeAway(ghost) {
+  const fade = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-out", fill: "both" });
+  liveAnimations.push(fade);
+  return fade.finished.catch(() => null);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function glide(update, morphs = []) {
+  stopGlides();
+  if (prefersReducedMotion()) {
     update();
-    return Promise.resolve();
+    transitionSettled = Promise.resolve();
+    return transitionSettled;
   }
 
   const root = document.documentElement;
-  const pairs = morphs.filter((pair) => isOnScreen(pair.from));
-  pairs.forEach((pair) => (pair.from.style.viewTransitionName = pair.name));
-  root.classList.toggle("is-morphing", pairs.length > 0);
-  root.classList.add("is-transitioning");
+  const token = ++transitionToken;
+  const pair = morphs.find((candidate) => isOnScreen(candidate.from));
+  const fromRect = pair?.from.getBoundingClientRect();
+  const cloneFrom = pair && pair.clone !== "to";
+  const fromRadius = pair ? cardRadius(pair.from) : "0px";
+  const copy = cloneFrom ? pair.from : null;
+  const sourceCopy = copy ? cloneForGlide(copy) : null;
 
-  const transition = document.startViewTransition(() => {
-    pairs.forEach((pair) => (pair.from.style.viewTransitionName = ""));
-    update();
-    pairs.forEach((pair) => {
-      const target = pair.to();
-      if (!target) return;
-      target.style.viewTransitionName = pair.name;
-      pair.target = target;
-    });
+  root.classList.toggle("is-morphing", Boolean(pair));
+  root.classList.add("is-transitioning");
+  update();
+  document.querySelectorAll("[data-view]:not([hidden])").forEach((view) => {
+    view.dataset.enter = pair ? "fade" : "rise";
   });
 
-  const cleanUp = () => {
-    pairs.forEach((pair) => {
-      pair.from.style.viewTransitionName = "";
-      if (pair.target) pair.target.style.viewTransitionName = "";
-    });
-    if (transitionSettled !== settled) return;
+  let motion;
+  const target = pair?.to();
+  if (pair && target && isOnScreen(target)) {
+    const toRect = target.getBoundingClientRect();
+    const base = toRect.width > fromRect.width ? toRect : fromRect;
+    const cardRect = cloneFrom ? fromRect : toRect;
+    const cardCorner = parseFloat(cloneFrom ? fromRadius : cardRadius(target)) || 0;
+    const radius = `${((cardCorner * base.width) / cardRect.width).toFixed(1)}px`;
+    const ghost = placeGhost(sourceCopy ?? cloneForGlide(target), base, radius);
+    motion = fly({ ghost, target, fromRect, toRect, base });
+  } else {
+    motion = sourceCopy ? fadeAway(placeGhost(sourceCopy, fromRect, fromRadius)) : Promise.resolve();
+    root.classList.remove("is-morphing");
+  }
+
+  const settled = Promise.all([motion, wait(VIEW_SETTLE_MS)]).then(() => {
+    if (token !== transitionToken) return;
+    stopGlides();
     root.classList.remove("is-morphing", "is-transitioning");
-  };
-  const settled = transition.finished.then(cleanUp, cleanUp);
+  });
   transitionSettled = settled;
   return settled;
 }
@@ -371,5 +458,5 @@ export {
   toast,
   trackScroll,
   watchSegmented,
-  withViewTransition,
+  glide,
 };

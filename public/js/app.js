@@ -25,7 +25,7 @@ import {
   toast,
   trackScroll,
   watchSegmented,
-  withViewTransition,
+  glide,
 } from "./ui.js";
 import { startPresence } from "./presence.js";
 import { createPlayer } from "./player.js";
@@ -88,7 +88,7 @@ function showView(name, morphs = [], { scrollTop = 0 } = {}) {
     if (name === "archive") syncSegmented(sortControl, { instant: changed });
   };
 
-  const settled = changed ? withViewTransition(apply, morphs) : (apply(), Promise.resolve());
+  const settled = changed ? glide(apply, morphs) : (apply(), Promise.resolve());
   if (leavingPlayer) {
     settled.then(() => {
       if (state.currentView !== "player") player.teardown();
@@ -134,7 +134,7 @@ function progressBarMarkup(percent) {
 function applyProgressWidths(root) {
   requestAnimationFrame(() => {
     root.querySelectorAll(".thumb__progress-fill[data-percent]").forEach((node) => {
-      node.style.width = `${Math.min(100, Number(node.dataset.percent) || 0)}%`;
+      node.style.transform = `scaleX(${(Math.min(100, Number(node.dataset.percent) || 0) / 100).toFixed(3)})`;
     });
   });
 }
@@ -189,7 +189,7 @@ function hydrateCards(root, handler) {
 function cardMorphs(card, pairs) {
   if (!card) return [];
   return pairs
-    .map(([selector, name, target]) => ({ from: card.querySelector(selector), name, to: () => document.getElementById(target) }))
+    .map(([selector, target]) => ({ from: card.querySelector(selector), to: () => document.getElementById(target) }))
     .filter((pair) => pair.from);
 }
 
@@ -428,7 +428,7 @@ function playerMorphs() {
     return node && isOnScreen(node) ? node : null;
   };
   return [
-    { from: document.getElementById("player-stage"), name: "morph-media", to: () => card()?.querySelector(".thumb") },
+    { from: document.getElementById("player-stage"), clone: "to", to: () => card()?.querySelector(".thumb") },
   ];
 }
 
@@ -454,7 +454,7 @@ async function openArchive(archiveId, { push = true, sort, query, from } = {}) {
   }
 
   const morphs = from
-    ? cardMorphs(from, [[".acard__covers", "morph-media", "archive-cover"]])
+    ? cardMorphs(from, [[".acard__covers", "archive-cover"]])
     : fromPlayer && reuse
       ? playerMorphs()
       : [];
@@ -518,6 +518,7 @@ async function loadVideoPage({ replace = false } = {}) {
     if (state.query) params.set("q", state.query);
 
     const page = await api.get(`/api/archives/${state.archive}/videos?${params}`);
+    if (replace) await afterTransition();
     if (requestId !== state.requestId) return;
 
     state.total = page.total;
@@ -614,7 +615,7 @@ async function openPlayer(videoId, { push = true, from } = {}) {
 
   showView(
     "player",
-    cardMorphs(from, [[".thumb", "morph-media", "player-stage"]]),
+    cardMorphs(from, [[".thumb", "player-stage"]]),
   );
   if (push) pushUrl(`v=${encodeURIComponent(videoId)}`);
 

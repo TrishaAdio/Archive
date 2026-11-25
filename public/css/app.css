@@ -14,6 +14,16 @@
   animation: viewIn 0.9s var(--ease-silk) both;
 }
 
+.view[data-enter="fade"] {
+  animation: viewFade 0.6s 0.1s var(--ease-silk) both;
+}
+
+@keyframes viewFade {
+  from {
+    opacity: 0;
+  }
+}
+
 @keyframes viewIn {
   from {
     opacity: 0;
@@ -235,23 +245,30 @@
   background: var(--veil);
   box-shadow: var(--shadow-1);
   transform: scale(var(--press, 1));
-  transition:
-    transform 0.9s var(--ease-silk),
-    box-shadow var(--t-slow) var(--ease-silk);
+  transition: transform 0.9s var(--ease-silk);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .acard {
     transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) scale(var(--press, 1));
+    transition:
+      transform 0.9s var(--ease-silk),
+      box-shadow var(--t-slow) var(--ease-silk);
   }
 }
 
 .acard.is-lit {
   --press: 0.985;
   box-shadow: var(--shadow-2), 0 30px 70px -36px rgba(255, 95, 143, 0.55);
-  transition:
-    transform 0.35s var(--ease-silk),
-    box-shadow var(--t-med) var(--ease-silk);
+  transition: transform 0.35s var(--ease-silk);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .acard.is-lit {
+    transition:
+      transform 0.35s var(--ease-silk),
+      box-shadow var(--t-med) var(--ease-silk);
+  }
 }
 
 @media (hover: hover) {
@@ -465,7 +482,6 @@
 .toolbar {
   position: sticky;
   top: calc(var(--bar-h) + var(--safe-t));
-  transition: top var(--t-med) var(--ease-out);
   z-index: 20;
   display: grid;
   gap: 10px;
@@ -579,8 +595,30 @@
 }
 
 .vcard {
+  position: relative;
+  isolation: isolate;
   cursor: pointer;
   outline: none;
+}
+
+.vcard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-md);
+  box-shadow: 0 26px 44px -22px rgba(255, 95, 143, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-slow) var(--ease-silk);
+}
+
+.vcard.is-lit::before {
+  opacity: 1;
+  transition-duration: var(--t-fast);
 }
 
 .vcard:focus-visible .thumb {
@@ -595,9 +633,7 @@
   background: var(--surface-2);
   box-shadow: var(--rim), 0 16px 34px -22px rgba(0, 0, 0, 0.9);
   transform: translateZ(0);
-  transition:
-    transform 0.8s var(--ease-silk),
-    box-shadow var(--t-slow) var(--ease-silk);
+  transition: transform 0.8s var(--ease-silk);
 }
 
 .thumb::before {
@@ -613,12 +649,10 @@
 @media (hover: hover) {
   .vcard:hover .thumb {
     transform: translateY(-5px);
-    box-shadow: var(--rim), 0 26px 44px -22px rgba(255, 95, 143, 0.55);
   }
-}
-
-.vcard.is-lit .thumb {
-  box-shadow: var(--rim), 0 26px 44px -22px rgba(255, 95, 143, 0.55);
+  .vcard:hover::before {
+    opacity: 1;
+  }
 }
 
 .vcard:active .thumb {
@@ -745,10 +779,12 @@
 .thumb__progress-fill {
   display: block;
   height: 100%;
-  width: 0;
+  width: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 1s var(--ease-out);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 1s var(--ease-out);
 }
 
 .vcard__title {
@@ -850,8 +886,9 @@
 
 .player__watermark {
   position: absolute;
-  top: var(--wm-y, 14%);
-  left: var(--wm-x, 10%);
+  top: 0;
+  left: 0;
+  translate: var(--wm-x, 40px) var(--wm-y, 30px);
   z-index: 2;
   font-family: var(--font-mono);
   font-stretch: 87.5%;
@@ -861,9 +898,7 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   pointer-events: none;
   user-select: none;
-  transition:
-    top 2.6s var(--ease-in-out),
-    left 2.6s var(--ease-in-out);
+  transition: translate 2.6s var(--ease-in-out);
 }
 
 .player__spinner {
@@ -887,9 +922,8 @@
   gap: 8px;
   padding: 8px 14px;
   border-radius: var(--r-full);
-  background: rgba(17, 14, 21, 0.86);
+  background: rgba(17, 14, 21, 0.93);
   border: 1px solid var(--line-strong);
-  backdrop-filter: blur(14px);
   font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
@@ -922,8 +956,7 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 18px;
-  background: linear-gradient(180deg, rgba(9, 7, 12, 0.35), rgba(9, 7, 12, 0.92));
-  backdrop-filter: blur(6px);
+  background: linear-gradient(180deg, rgba(9, 7, 12, 0.5), rgba(9, 7, 12, 0.95));
   animation: fadeIn 0.4s var(--ease-out);
 }
 
@@ -1567,7 +1600,7 @@
   overflow: hidden;
   border-radius: var(--r-full);
   background: rgba(255, 240, 236, 0.2);
-  transition: height 0.35s var(--ease-silk);
+  transition: transform 0.35s var(--ease-silk);
 }
 
 .pc__buffered,
@@ -1611,7 +1644,7 @@
 
 .pc.is-scrubbing .pc__track,
 .pc__seek:focus-visible .pc__track {
-  height: 6px;
+  transform: scaleY(1.5);
 }
 
 .pc__bubble {
@@ -1772,7 +1805,7 @@
     scale: 1.05;
   }
   .pc__seek:hover .pc__track {
-    height: 6px;
+    transform: scaleY(1.5);
   }
   .pc__seek:hover .pc__knob {
     scale: 1;
