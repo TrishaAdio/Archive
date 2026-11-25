@@ -124,6 +124,7 @@ function startSilk({ intensity = 1, flowRate = 0.12 } = {}) {
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   const downscale = (navigator.hardwareConcurrency ?? 4) <= 4 ? 7 : 5;
 
+  const rootClasses = document.documentElement.classList;
   const canvas = document.createElement("canvas");
   canvas.className = "silk";
   canvas.setAttribute("aria-hidden", "true");
@@ -230,6 +231,7 @@ function startSilk({ intensity = 1, flowRate = 0.12 } = {}) {
       (bloom.duration > 0 && now - bloom.startedAt < bloom.duration);
 
     if (!busy && now - lastDraw < IDLE_FRAME_MS - 2) return;
+    if (rootClasses.contains("is-transitioning")) return;
     lastDraw = now;
     draw(now);
   }

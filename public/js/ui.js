@@ -97,15 +97,23 @@ function isOnScreen(node) {
   return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
 }
 
+let transitionSettled = Promise.resolve();
+
+function afterTransition() {
+  return transitionSettled;
+}
+
 function withViewTransition(update, morphs = []) {
   if (!document.startViewTransition || prefersReducedMotion()) {
     update();
     return Promise.resolve();
   }
 
+  const root = document.documentElement;
   const pairs = morphs.filter((pair) => isOnScreen(pair.from));
   pairs.forEach((pair) => (pair.from.style.viewTransitionName = pair.name));
-  document.documentElement.classList.toggle("is-morphing", pairs.length > 0);
+  root.classList.toggle("is-morphing", pairs.length > 0);
+  root.classList.add("is-transitioning");
 
   const transition = document.startViewTransition(() => {
     pairs.forEach((pair) => (pair.from.style.viewTransitionName = ""));
@@ -119,13 +127,16 @@ function withViewTransition(update, morphs = []) {
   });
 
   const cleanUp = () => {
-    document.documentElement.classList.remove("is-morphing");
     pairs.forEach((pair) => {
       pair.from.style.viewTransitionName = "";
       if (pair.target) pair.target.style.viewTransitionName = "";
     });
+    if (transitionSettled !== settled) return;
+    root.classList.remove("is-morphing", "is-transitioning");
   };
-  return transition.finished.then(cleanUp, cleanUp);
+  const settled = transition.finished.then(cleanUp, cleanUp);
+  transitionSettled = settled;
+  return settled;
 }
 
 function splitReveal(node, { delay = 0, play = true } = {}) {
@@ -345,6 +356,7 @@ function greeting(date = new Date()) {
 }
 
 export {
+  afterTransition,
   closeScrim,
   confirmSheet,
   countUp,

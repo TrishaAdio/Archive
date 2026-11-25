@@ -11,6 +11,7 @@ import {
   revealOnScroll,
 } from "./api.js";
 import {
+  afterTransition,
   closeScrim,
   countUp,
   enableTouchLight,
@@ -79,7 +80,6 @@ function showView(name, morphs = [], { scrollTop = 0 } = {}) {
   if (leavingPlayer) player.pause();
 
   const apply = () => {
-    if (leavingPlayer) player.teardown();
     Object.entries(views).forEach(([key, node]) => {
       node.hidden = key !== name;
     });
@@ -88,8 +88,13 @@ function showView(name, morphs = [], { scrollTop = 0 } = {}) {
     if (name === "archive") syncSegmented(sortControl, { instant: changed });
   };
 
-  if (changed) withViewTransition(apply, morphs);
-  else apply();
+  const settled = changed ? withViewTransition(apply, morphs) : (apply(), Promise.resolve());
+  if (leavingPlayer) {
+    settled.then(() => {
+      if (state.currentView !== "player") player.teardown();
+    });
+  }
+  return settled;
 }
 
 function route() {
@@ -424,7 +429,6 @@ function playerMorphs() {
   };
   return [
     { from: document.getElementById("player-stage"), name: "morph-media", to: () => card()?.querySelector(".thumb") },
-    { from: document.getElementById("player-title"), name: "morph-title", to: () => card()?.querySelector(".vcard__title") },
   ];
 }
 
@@ -450,23 +454,19 @@ async function openArchive(archiveId, { push = true, sort, query, from } = {}) {
   }
 
   const morphs = from
-    ? cardMorphs(from, [
-        [".acard__covers", "morph-media", "archive-cover"],
-        [".acard__title", "morph-title", "archive-title"],
-      ])
+    ? cardMorphs(from, [[".acard__covers", "morph-media", "archive-cover"]])
     : fromPlayer && reuse
       ? playerMorphs()
       : [];
-
-  showView("archive", morphs, { scrollTop: fromPlayer && reuse ? state.archiveScroll : 0 });
-  if (push) pushUrl(`a=${encodeURIComponent(archiveId)}`);
 
   sortControl.querySelectorAll(".sort").forEach((node) => {
     const active = node.dataset.sort === state.sort;
     node.classList.toggle("is-active", active);
     node.setAttribute("aria-selected", String(active));
   });
-  syncSegmented(sortControl);
+
+  showView("archive", morphs, { scrollTop: fromPlayer && reuse ? state.archiveScroll : 0 });
+  if (push) pushUrl(`a=${encodeURIComponent(archiveId)}`);
 
   if (reuse) {
     refreshCardStats();
@@ -485,6 +485,7 @@ async function refreshCardStats() {
   if (state.query) params.set("q", state.query);
   try {
     const page = await api.get(`/api/archives/${state.archive}/videos?${params}`);
+    await afterTransition();
     page.videos.forEach((video) => {
       const card = document.querySelector(`#video-grid [data-video="${CSS.escape(video.id)}"]`);
       if (!card) return;
@@ -613,10 +614,7 @@ async function openPlayer(videoId, { push = true, from } = {}) {
 
   showView(
     "player",
-    cardMorphs(from, [
-      [".thumb", "morph-media", "player-stage"],
-      [".vcard__title", "morph-title", "player-title"],
-    ]),
+    cardMorphs(from, [[".thumb", "morph-media", "player-stage"]]),
   );
   if (push) pushUrl(`v=${encodeURIComponent(videoId)}`);
 
@@ -624,7 +622,9 @@ async function openPlayer(videoId, { push = true, from } = {}) {
   const ambient = document.getElementById("player-ambient");
   ambient.classList.remove("is-loaded");
   ambient.onload = () => ambient.classList.add("is-loaded");
-  ambient.src = thumbUrl(videoId);
+  afterTransition().then(() => {
+    if (state.playingId === videoId) ambient.src = thumbUrl(videoId);
+  });
 
   try {
     const video = await api.get(`/api/videos/${videoId}`);
@@ -700,6 +700,8 @@ async function loadUpNext(video) {
       api.get(`/api/archives/${video.archiveId}/videos?sort=popular&limit=12`),
       api.get(`/api/archives/${video.archiveId}/videos?sort=number&skip=${Math.max(0, video.number)}&limit=1`),
     ]);
+    await afterTransition();
+    if (state.playingId !== video.id) return;
 
     const others = popular.videos.filter((item) => item.id !== video.id).slice(0, 10);
     upNext.video = ordered.videos.find((item) => item.playable && item.id !== video.id) ?? others.find((item) => item.playable) ?? null;

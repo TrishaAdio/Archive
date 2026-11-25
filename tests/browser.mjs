@@ -493,7 +493,11 @@ async function main() {
       videoSrc: document.getElementById("player-video").getAttribute("src"),
     }));
     check("archive grid comes back instantly with no loading skeletons", afterBack.skeletons === 0 && afterBack.cards === 9, JSON.stringify(afterBack));
-    check("leaving the player stops the stream", !afterBack.videoSrc, JSON.stringify(afterBack));
+    check("leaving the player pauses the video at once", await page.evaluate(() => document.getElementById("player-video").paused));
+    const streamStopped = await page
+      .waitForFunction(() => !document.getElementById("player-video").getAttribute("src"), null, { timeout: 4000 })
+      .then(() => true, () => false);
+    check("leaving the player stops the stream once the animation ends", streamStopped, JSON.stringify(afterBack));
     await page.waitForFunction(
       () => document.querySelector('#video-grid [data-video] .vcard__meta')?.textContent.includes("1 view"),
       { timeout: 6000 },
