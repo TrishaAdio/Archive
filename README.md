@@ -82,15 +82,17 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 
 ```bash
 npm run test:e2e        # 239 API and security checks against a temporary MongoDB
-npm run test:browser    # 159 checks driving real Chromium, including video playback
+npm run test:browser    # 160 checks driving real Chromium, including video playback
 npm run test:telegram   # 90 checks of Telegram login, downloads, resume and restarts
 npm run screenshots     # writes screenshots/ for a visual pass
 npm run perf            # frame timing on a throttled phone-sized screen
 ```
 
 `npm run perf` measures the unlock animation on a 390×844 screen at 3× pixel density. Set
-`CPU_SLOWDOWN=6` to slow the CPU like a budget phone, and `SCENARIO=touch` to measure a finger
-dragging across the gate instead.
+`CPU_SLOWDOWN=6` to slow the CPU like a budget phone. `SCENARIO=touch` measures a finger
+dragging across the gate, `SCENARIO=open` measures opening a video from an archive, and
+`SCENARIO=back` measures going back from a playing video to the archive. `SHOW_FRAMES=1` prints
+every frame time.
 
 Every suite starts its own MongoDB and server, so nothing needs to be running first. The
 Telegram, browser and screenshot runs never contact Telegram. They set `TELEGRAM_DRIVER_MODULE`

@@ -79,7 +79,7 @@
   --ease-snap: cubic-bezier(0.2, 0.9, 0.25, 1.12);
   --ease-silk: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-glide: cubic-bezier(0.62, 0, 0.18, 1);
-  --ease-morph: cubic-bezier(0.55, 0.05, 0.12, 1);
+  --ease-morph: cubic-bezier(0.32, 0.72, 0, 1);
 
   --t-fast: 200ms;
   --t-med: 420ms;
@@ -1128,17 +1128,8 @@ textarea.input {
   animation-timing-function: var(--ease-silk);
 }
 
-::view-transition-group(morph-media),
-::view-transition-group(morph-title) {
-  animation-duration: 1.3s;
-  animation-timing-function: var(--ease-morph);
-}
-
-::view-transition-old(morph-media),
-::view-transition-new(morph-media),
-::view-transition-old(morph-title),
-::view-transition-new(morph-title) {
-  animation-duration: 1.3s;
+::view-transition-group(morph-media) {
+  animation-duration: 0.9s;
   animation-timing-function: var(--ease-morph);
 }
 
@@ -1148,14 +1139,8 @@ textarea.input {
   width: 100%;
   object-fit: cover;
   overflow: clip;
-}
-
-::view-transition-old(morph-title),
-::view-transition-new(morph-title) {
-  height: 100%;
-  width: auto;
-  object-fit: contain;
-  object-position: left top;
+  animation-duration: 0.9s;
+  animation-timing-function: var(--ease-morph);
 }
 
 ::view-transition-old(root) {
@@ -1167,12 +1152,12 @@ textarea.input {
 }
 
 .is-morphing::view-transition-old(root) {
-  animation-duration: 0.6s;
+  animation-duration: 0.45s;
 }
 
 .is-morphing::view-transition-new(root) {
-  animation-duration: 0.95s;
-  animation-delay: 0.22s;
+  animation-duration: 0.7s;
+  animation-delay: 0.12s;
   animation-fill-mode: both;
 }
 
