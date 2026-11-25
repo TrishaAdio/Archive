@@ -28,6 +28,8 @@ async function connectDatabase({ mongoUri, mongoDbName }) {
     broadcasts: db.collection("broadcasts"),
     broadcastAcks: db.collection("broadcast_acks"),
     auditLog: db.collection("audit_log"),
+    telegramAccounts: db.collection("telegram_accounts"),
+    telegramJobs: db.collection("telegram_jobs"),
   };
 
   await Promise.all([
@@ -73,6 +75,10 @@ async function connectDatabase({ mongoUri, mongoDbName }) {
       { key: { broadcastId: 1, keyId: 1 }, name: "broadcast_key_unique", unique: true },
     ]),
     collections.auditLog.createIndexes([{ key: { createdAt: -1 }, name: "createdAt" }]),
+    collections.telegramJobs.createIndexes([
+      { key: { createdAt: -1 }, name: "createdAt" },
+      { key: { status: 1 }, name: "status" },
+    ]),
   ]);
 
   return { client, db, collections };

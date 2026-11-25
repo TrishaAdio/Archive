@@ -82,7 +82,8 @@ server, start it with `--replSet rs0` and run `rs.initiate()` once.
 
 ```bash
 npm run test:e2e        # 239 API and security checks against a temporary MongoDB
-npm run test:browser    # 144 checks driving real Chromium, including video playback
+npm run test:browser    # 159 checks driving real Chromium, including video playback
+npm run test:telegram   # 90 checks of Telegram login, downloads, resume and restarts
 npm run screenshots     # writes screenshots/ for a visual pass
 npm run perf            # frame timing on a throttled phone-sized screen
 ```
@@ -91,7 +92,10 @@ npm run perf            # frame timing on a throttled phone-sized screen
 `CPU_SLOWDOWN=6` to slow the CPU like a budget phone, and `SCENARIO=touch` to measure a finger
 dragging across the gate instead.
 
-Both suites start their own MongoDB and server, so nothing needs to be running first.
+Every suite starts its own MongoDB and server, so nothing needs to be running first. The
+Telegram, browser and screenshot runs never contact Telegram. They set `TELEGRAM_DRIVER_MODULE`
+to `tests/fake-telegram.mjs`, a stand-in that serves generated files. Leave that
+variable unset in production.
 
 ## How the pieces fit together
 
@@ -154,6 +158,48 @@ a load takes longer than 450 ms, so short waits do not flash it.
 
 Pressing back from a video returns to the archive you came from at the same scroll position.
 The grid is kept in memory, so nothing reloads. View and like counts refresh in the background.
+
+### Downloading from Telegram
+
+The **Telegram** tab logs the server in as a Telegram user account (a "userbot") and turns a
+chat into an archive.
+
+1. **Connect an account.** Create an app at [my.telegram.org](https://my.telegram.org) under
+   API development tools, then enter its API ID, API hash and the account's phone number.
+   Telegram sends a login code to the app, and accounts with two-step verification are asked
+   for the password next. The session and API hash are stored in MongoDB encrypted with
+   AES-256-GCM, using a key derived from `SESSION_SECRET`. Changing `SESSION_SECRET` means
+   logging in again. The password is never stored.
+2. **Download a chat.** Paste a public link (`https://t.me/name` or `@name`), an invite link
+   (`https://t.me/+AbC…`), or a `t.me/c/…` link for a private channel the account is already in.
+   Give the archive a name and a category code. If the code is new, also give it a name and it
+   is created. The server joins the chat, finds every video (including videos sent as files),
+   and downloads them in the order they were posted.
+3. **Watch it run.** Each download shows percent, bytes, speed, time left, videos done, and the
+   files currently in flight. The page refreshes every second while something is running.
+
+Details:
+
+- Files go to `MEDIA_ROOT/telegram/<code>-<archive-name>/` as `0001 Title.mp4`,
+  `0002 Title.mp4` and so on. The title comes from the file name, or the first caption line when
+  the file name is generic like `VID_2024…`. Each video joins the archive as soon as it
+  finishes, numbered #1, #2… in chat order even though three files download at once.
+- **Also save a .zip copy** writes `MEDIA_ROOT/telegram/<code>-<archive-name>.zip` (stored, not
+  recompressed) when the download ends. Viewers always stream from the folder. The zip is only a
+  backup, and it uses the same disk space again.
+- Before downloading, the server checks there is enough free disk space and stops with a clear
+  message if there is not.
+- **Stop** keeps what was downloaded. **Resume** continues from the last 512 KB of each
+  unfinished file. Restarting the server, for example by re-running `setup.sh`, parks a running
+  download and continues it automatically when the server comes back.
+- Network errors are retried 3 times per file. When Telegram asks the account to slow down, the
+  download waits as long as Telegram says. A file that keeps failing is listed on the card, and
+  **Resume** tries it again.
+- Chats with Telegram's "Restrict saving content" turned on are refused.
+- Downloads run one chat at a time. Others wait in line.
+
+Telegram limits accounts that join many chats or download heavily, so a spare account is safer
+than your main one. Only download chats you have the right to share.
 
 ### Live viewers and broadcasts
 
@@ -290,7 +336,8 @@ src/
     engagement.js        progress, likes, view counting
     broadcasts.js        broadcasts and acknowledgements
     counters.js          atomic sequence blocks
-  routes/                gate, catalog, stream, engagement, admin
+    telegram/            account login, link parsing, download jobs, GramJS driver
+  routes/                gate, catalog, stream, engagement, admin, telegram
 public/
   index.html watch.html admin.html
   css/   theme.css (tokens, shared) + gate, app, admin
@@ -299,6 +346,7 @@ public/
 tests/
   e2e.mjs        API and security
   browser.mjs    real Chromium
+  telegram.mjs   Telegram downloads against a fake Telegram
   screenshots.mjs
 ```
 

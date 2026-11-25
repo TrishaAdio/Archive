@@ -372,7 +372,22 @@ function createMediaService({ mediaRoot }) {
     return { absolute, sizeBytes: stat.size, modifiedAt: stat.mtime };
   }
 
+  async function ensureDirectory(relPath) {
+    const target = await resolveForWrite(relPath);
+    await fs.mkdir(target.absolute, { recursive: true });
+    const real = await fs.realpath(target.absolute);
+    assertContained(target.root, real);
+    return { absolute: real, relative: path.relative(target.root, real), root: target.root };
+  }
+
+  async function freeBytes() {
+    const stats = await fs.statfs(await canonicalRoot());
+    return Number(stats.bavail) * Number(stats.bsize);
+  }
+
   return {
+    ensureDirectory,
+    freeBytes,
     listDirectory,
     scanVideos,
     extractZip,

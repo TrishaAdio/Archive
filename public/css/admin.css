@@ -702,3 +702,241 @@
     transform: none;
   }
 }
+
+.tg-form {
+  display: grid;
+}
+
+.tg-form__pair {
+  display: grid;
+  gap: 0 12px;
+}
+
+@media (min-width: 680px) {
+  .tg-form__pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tg-form__lead {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.tg-form__code {
+  font-size: 22px;
+  letter-spacing: 0.3em;
+}
+
+.tg-form__buttons {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+}
+
+.tg-form__note {
+  margin: -4px 0 14px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.tg-form .btn--block + .tg-form__note {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.tg-account:not([hidden]) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: var(--r-md);
+  background: rgba(99, 226, 181, 0.06);
+  border: 1px solid rgba(99, 226, 181, 0.22);
+}
+
+.tg-account .row__lead {
+  color: var(--mint);
+}
+
+.check {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  align-items: start;
+  margin: 2px 0 16px;
+  cursor: pointer;
+}
+
+.check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.check__box {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: rgba(9, 7, 12, 0.6);
+  transition:
+    background-color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.check__box::after {
+  content: "";
+  display: block;
+  width: 11px;
+  height: 6px;
+  margin: 6px 0 0 5px;
+  border-left: 2px solid var(--accent-ink);
+  border-bottom: 2px solid var(--accent-ink);
+  transform: rotate(-45deg) scale(0.4);
+  opacity: 0;
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-spring);
+}
+
+.check input:checked + .check__box {
+  background: var(--peach);
+  border-color: var(--peach);
+}
+
+.check input:checked + .check__box::after {
+  opacity: 1;
+  transform: rotate(-45deg) scale(1);
+}
+
+.check input:focus-visible + .check__box {
+  outline: 2px solid var(--peach);
+  outline-offset: 2px;
+}
+
+.check__text {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.check__text small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.tgjob {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border-radius: var(--r-md);
+  background: rgba(13, 11, 16, 0.7);
+  border: 1px solid var(--line);
+  animation: rowIn 0.5s var(--ease-out) both;
+}
+
+.tgjob.is-active {
+  border-color: rgba(255, 174, 138, 0.22);
+}
+
+.tgjob__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tgjob__head .row__main {
+  flex: 1 1 auto;
+}
+
+.tgjob__bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 240, 230, 0.07);
+}
+
+.tgjob__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.9s linear;
+}
+
+.tgjob.is-done .tgjob__fill {
+  background: var(--mint);
+}
+
+.tgjob__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.tgjob__stats span:first-child {
+  color: var(--peach);
+}
+
+.tgjob__current {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tgjob__current li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.tgjob__file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tgjob__note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.tgjob__note.is-error {
+  color: var(--rose);
+}
+
+.tgjob__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tgjob__actions:not(:has(button:not([hidden]))) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tgjob__fill {
+    transition: none;
+  }
+}

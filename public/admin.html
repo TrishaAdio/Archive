@@ -65,6 +65,7 @@
           <button class="segmented__item tab is-active" data-tab="dashboard" role="tab" type="button">Dashboard</button>
           <button class="segmented__item tab" data-tab="library" role="tab" type="button">Library</button>
           <button class="segmented__item tab" data-tab="keys" role="tab" type="button">Access keys</button>
+          <button class="segmented__item tab" data-tab="telegram" role="tab" type="button">Telegram</button>
           <button class="segmented__item tab" data-tab="broadcast" role="tab" type="button">Broadcast</button>
           <button class="segmented__item tab" data-tab="activity" role="tab" type="button">Activity</button>
         </div>
@@ -230,6 +231,132 @@
               <input class="input" id="key-search" placeholder="Search note or key hint" />
             </div>
             <div class="list" id="key-list"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="telegram" hidden>
+          <header class="panel-head">
+            <p class="eyebrow">Telegram</p>
+            <h1 class="panel-head__title">Pull a chat into an <em>archive</em></h1>
+          </header>
+
+          <div class="card">
+            <div class="card__head">
+              <span class="step">01</span>
+              <div>
+                <h2 class="card__title">Telegram account</h2>
+                <p class="card__hint">
+                  The server logs in as your Telegram user, so it can join chats and download their
+                  videos. Get an API ID and API hash at my.telegram.org, under API development tools.
+                </p>
+              </div>
+            </div>
+
+            <div class="tg-account" id="tg-account" hidden>
+              <span class="row__lead" id="tg-account-icon"></span>
+              <div class="row__main">
+                <strong class="row__title" id="tg-account-name"></strong>
+                <span class="row__sub" id="tg-account-sub"></span>
+              </div>
+              <button class="btn btn--ghost btn--sm" id="tg-logout" type="button">Disconnect</button>
+            </div>
+
+            <form class="tg-form" id="tg-login-form" hidden>
+              <div class="tg-form__pair">
+                <label class="field">
+                  <span class="field__label">API ID</span>
+                  <input class="input mono" id="tg-api-id" inputmode="numeric" autocomplete="off" placeholder="1234567" required />
+                </label>
+                <label class="field">
+                  <span class="field__label">API hash</span>
+                  <input class="input mono" id="tg-api-hash" autocomplete="off" spellcheck="false" placeholder="32 letters and numbers" required />
+                </label>
+              </div>
+              <label class="field">
+                <span class="field__label">Phone number of the Telegram account</span>
+                <input class="input" id="tg-phone" type="tel" autocomplete="off" placeholder="+15551234567" required />
+              </label>
+              <button class="btn btn--primary btn--block" type="submit">Send login code</button>
+            </form>
+
+            <form class="tg-form" id="tg-code-form" hidden>
+              <p class="tg-form__lead" id="tg-code-lead"></p>
+              <label class="field">
+                <span class="field__label">Login code</span>
+                <input class="input mono tg-form__code" id="tg-code" inputmode="numeric" autocomplete="one-time-code" placeholder="12345" required />
+              </label>
+              <div class="tg-form__buttons">
+                <button class="btn btn--ghost" data-tg-restart type="button">Start over</button>
+                <button class="btn btn--primary" type="submit">Log in</button>
+              </div>
+            </form>
+
+            <form class="tg-form" id="tg-password-form" hidden>
+              <p class="tg-form__lead" id="tg-password-lead">This account has two-step verification. Enter its password.</p>
+              <label class="field">
+                <span class="field__label">Two-step verification password</span>
+                <input class="input" id="tg-password" type="password" autocomplete="off" required />
+              </label>
+              <div class="tg-form__buttons">
+                <button class="btn btn--ghost" data-tg-restart type="button">Start over</button>
+                <button class="btn btn--primary" type="submit">Log in</button>
+              </div>
+            </form>
+
+            <p class="notice notice--error" id="tg-login-error" role="alert" hidden></p>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <span class="step">02</span>
+              <div>
+                <h2 class="card__title">Download a chat</h2>
+                <p class="card__hint">
+                  Paste a channel or group link. The server joins it, downloads every video in the
+                  order it was posted, and files them as a new archive numbered #1, #2 and so on.
+                  Only download chats you have the right to share.
+                </p>
+              </div>
+            </div>
+
+            <form class="tg-form" id="tg-job-form">
+              <label class="field">
+                <span class="field__label">Chat link</span>
+                <input class="input" id="tg-link" autocomplete="off" spellcheck="false" placeholder="https://t.me/channel or https://t.me/+invite" required />
+              </label>
+              <label class="field">
+                <span class="field__label">Archive name</span>
+                <input class="input" id="tg-archive-name" autocomplete="off" placeholder="e.g. Summer Collection" required />
+              </label>
+              <div class="tg-form__pair">
+                <label class="field">
+                  <span class="field__label">Category code</span>
+                  <input class="input mono" id="tg-category-code" list="tg-category-codes" inputmode="numeric" autocomplete="off" placeholder="e.g. 12" required />
+                  <datalist id="tg-category-codes"></datalist>
+                </label>
+                <label class="field" id="tg-category-name-field" hidden>
+                  <span class="field__label">Name for the new code</span>
+                  <input class="input" id="tg-category-name" autocomplete="off" placeholder="e.g. Premium" />
+                </label>
+              </div>
+              <p class="tg-form__note" id="tg-category-note" hidden></p>
+              <label class="check">
+                <input type="checkbox" id="tg-keep-zip" />
+                <span class="check__box" aria-hidden="true"></span>
+                <span class="check__text">
+                  Also save a .zip copy when it finishes
+                  <small>Viewers watch from the folder either way. The zip uses the same disk space again.</small>
+                </span>
+              </label>
+              <p class="notice notice--error" id="tg-job-error" role="alert" hidden></p>
+              <button class="btn btn--primary btn--block" id="tg-job-button" type="submit">Start download</button>
+              <p class="tg-form__note" id="tg-job-locked">Connect a Telegram account first.</p>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2 class="card__title">Downloads</h2>
+            <div class="list" id="tg-jobs"></div>
           </div>
         </section>
 

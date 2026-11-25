@@ -17,6 +17,8 @@ import { createCatalogRouter } from "./routes/catalog.js";
 import { createStreamRouter } from "./routes/stream.js";
 import { createEngagementRouter } from "./routes/engagement.js";
 import { createAdminRouter } from "./routes/admin.js";
+import { createTelegramRouter } from "./routes/telegram.js";
+import { createTelegramService } from "./services/telegram/index.js";
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 
@@ -29,6 +31,7 @@ function createApp({ config, db, collections }) {
   const engagement = createEngagementService(collections, config);
   const broadcasts = createBroadcastService(collections);
   const auth = createAuthMiddleware({ config, accessKeys, sessions });
+  const telegram = createTelegramService({ collections, config, catalog, media });
 
   async function audit(action, detail = {}) {
     try {
@@ -83,6 +86,7 @@ function createApp({ config, db, collections }) {
     }
   });
 
+  app.use("/api/admin/telegram", auth.requireAdmin, createTelegramRouter({ telegram, audit }));
   app.use(
     "/api/admin",
     createAdminRouter({ config, accessKeys, sessions, catalog, media, broadcasts, auth, audit, collections }),
@@ -136,7 +140,7 @@ function createApp({ config, db, collections }) {
     res.status(500).json({ error: "Internal server error", code: "internal_error" });
   });
 
-  return { app, services: { accessKeys, sessions, catalog, media, broadcasts, engagement, counters } };
+  return { app, services: { accessKeys, sessions, catalog, media, broadcasts, engagement, counters, telegram } };
 }
 
 export { createApp };

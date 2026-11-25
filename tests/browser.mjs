@@ -119,6 +119,7 @@ async function main() {
       IP_MATCH_MODE: "strict",
       TRUST_PROXY_HOPS: "0",
       COOKIE_SECURE: "false",
+      TELEGRAM_DRIVER_MODULE: path.resolve(import.meta.dirname, "fake-telegram.mjs"),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -605,6 +606,52 @@ async function main() {
     await adminPage.waitForSelector("#live-list .row", { timeout: 10000 });
     check("activity tab lists the live viewer", (await adminPage.locator("#live-list .row").count()) >= 1);
     check("audit log has entries", (await adminPage.locator("#audit-list .row").count()) >= 1);
+
+    section("Telegram downloads in the owner console");
+    await adminPage.click('.tab[data-tab="telegram"]');
+    await adminPage.waitForSelector("#tg-login-form:not([hidden])", { timeout: 6000 });
+    check("telegram tab asks for API details first", await adminPage.locator("#tg-login-form").isVisible());
+    check("start download is locked until an account is connected", await adminPage.locator("#tg-job-button").isDisabled());
+    await adminPage.fill("#tg-api-id", "123456");
+    await adminPage.fill("#tg-api-hash", "0123456789abcdef0123456789abcdef");
+    await adminPage.fill("#tg-phone", "+15550002");
+    await adminPage.click('#tg-login-form button[type="submit"]');
+    await adminPage.waitForSelector("#tg-code-form:not([hidden])", { timeout: 6000 });
+    check("the code step names where the code went", (await adminPage.locator("#tg-code-lead").textContent()).includes("Telegram app"));
+    await adminPage.fill("#tg-code", "00000");
+    await adminPage.click('#tg-code-form button[type="submit"]');
+    await adminPage.waitForSelector("#tg-login-error:not([hidden])", { timeout: 6000 });
+    check("a wrong code shows a clear error", (await adminPage.locator("#tg-login-error").textContent()).includes("wrong"));
+    await adminPage.fill("#tg-code", "12345");
+    await adminPage.click('#tg-code-form button[type="submit"]');
+    await adminPage.waitForSelector("#tg-password-form:not([hidden])", { timeout: 6000 });
+    check("two-step password step shows the hint", (await adminPage.locator("#tg-password-lead").textContent()).includes("the usual"));
+    await adminPage.fill("#tg-password", "hunter2");
+    await adminPage.click('#tg-password-form button[type="submit"]');
+    await adminPage.waitForSelector("#tg-account:not([hidden])", { timeout: 6000 });
+    check("the connected account is shown", (await adminPage.locator("#tg-account-name").textContent()) === "Second Account");
+    check("start download unlocks after connecting", await adminPage.locator("#tg-job-button").isEnabled());
+
+    await adminPage.fill("#tg-category-code", "88");
+    check("a new code asks for its name", await adminPage.locator("#tg-category-name-field").isVisible());
+    await adminPage.fill("#tg-category-code", "12");
+    check("an existing code needs no name", await adminPage.locator("#tg-category-name-field").isHidden());
+    await adminPage.fill("#tg-link", "https://t.me/slowchan");
+    await adminPage.fill("#tg-archive-name", "Browser Drops");
+    await adminPage.fill("#tg-category-code", "88");
+    await adminPage.fill("#tg-category-name", "Drops");
+    await adminPage.click("#tg-job-button");
+    await adminPage.waitForFunction(() => document.querySelector(".tgjob.is-active .tgjob__stats")?.textContent.includes("/s"), null, { timeout: 20000 });
+    const liveStats = await adminPage.locator(".tgjob .tgjob__stats").textContent();
+    check("the download card shows speed", /\/s/.test(liveStats), liveStats);
+    check("the download card shows time left", /left/.test(liveStats), liveStats);
+    check("the download card shows the video count", /of 4 videos/.test(liveStats), liveStats);
+    check("the progress bar moves with a transform", /scaleX\(0\.\d+\)/.test(await adminPage.locator(".tgjob__fill").getAttribute("style")));
+    await adminPage.waitForSelector(".tgjob.is-done", { timeout: 30000 });
+    check("the card turns done when every video is saved", (await adminPage.locator(".tgjob .pill").textContent()) === "Done");
+    await adminPage.click('.tab[data-tab="library"]');
+    await adminPage.waitForFunction(() => document.getElementById("archive-list").textContent.includes("Browser Drops"), null, { timeout: 6000 });
+    check("the new archive appears in the library", true);
 
     section("Owner expires the viewer mid-session");
     await adminPage.click('.tab[data-tab="keys"]');
