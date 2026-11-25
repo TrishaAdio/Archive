@@ -13,12 +13,12 @@ import {
 import {
   closeScrim,
   countUp,
-  enableSpotlight,
-  enableTilt,
+  enableTouchLight,
   enhanceButtons,
   greeting,
   haptic,
   prefersReducedMotion,
+  splitReveal,
   syncSegmented,
   toast,
   trackScroll,
@@ -27,6 +27,7 @@ import {
 } from "./ui.js";
 import { startPresence } from "./presence.js";
 import { createPlayer } from "./player.js";
+import { startSilk } from "./silk.js";
 
 const PAGE_SIZE = 24;
 const RING_LENGTH = 326.73;
@@ -65,7 +66,7 @@ function leaveToGate(message) {
   window.location.replace(target);
 }
 
-function showView(name) {
+function showView(name, morphs = []) {
   const changed = state.currentView !== name;
   state.currentView = name;
 
@@ -78,7 +79,7 @@ function showView(name) {
     if (name === "archive") syncSegmented(sortControl, { instant: changed });
   };
 
-  if (changed) withViewTransition(apply);
+  if (changed) withViewTransition(apply, morphs);
   else apply();
 }
 
@@ -137,8 +138,8 @@ function videoCardMarkup(video, { showArchive } = {}) {
     : plural(video.likeCount, "like");
 
   return `
-    <article class="vcard reveal" data-video="${video.id}" tabindex="0" role="button" aria-label="Play #${video.number} ${escapeHtml(video.title)}">
-      <div class="thumb">
+    <article class="vcard reveal" data-video="${video.id}" data-light tabindex="0" role="button" aria-label="Play #${video.number} ${escapeHtml(video.title)}">
+      <div class="thumb" data-light-host>
         <img class="thumb__img" data-fade src="${thumbUrl(video.id)}" alt="" loading="lazy" decoding="async" />
         <span class="thumb__number">#${video.number}</span>
         ${progressBarMarkup(video.progressPercent)}
@@ -156,7 +157,7 @@ function videoCardMarkup(video, { showArchive } = {}) {
 function hydrateCards(root, handler) {
   root.querySelectorAll("[data-video]:not([data-bound])").forEach((node) => {
     node.dataset.bound = "1";
-    const open = () => handler(node.dataset.video);
+    const open = () => handler(node.dataset.video, node);
     node.addEventListener("click", open);
     node.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -167,7 +168,19 @@ function hydrateCards(root, handler) {
   });
   markImagesOnLoad(root);
   applyProgressWidths(root);
+  enableTouchLight(root);
   revealOnScroll(root);
+}
+
+function cardMorphs(card, pairs) {
+  if (!card) return [];
+  return pairs
+    .map(([selector, name, target]) => ({ from: card.querySelector(selector), name, to: () => document.getElementById(target) }))
+    .filter((pair) => pair.from);
+}
+
+function openVideoCard(id, card) {
+  return openPlayer(id, { from: card });
 }
 
 async function openHome({ push = true } = {}) {
@@ -266,7 +279,7 @@ function renderHero(category, archives, viewer) {
 
   document.getElementById("hero-eyebrow").textContent = `Tier ${category.code} · Members`;
   document.getElementById("hero-greeting").textContent = `${greeting()}, welcome back`;
-  document.getElementById("hero-title").textContent = category.name ?? `Category ${category.code}`;
+  renderHeroTitle(category.name ?? `Category ${category.code}`);
   document.getElementById("hero-sub").textContent = archives.length
     ? `${plural(archives.length, "archive")} and ${plural(videoTotal, "video")} curated for your tier.`
     : "Your collection is being prepared.";
@@ -275,6 +288,17 @@ function renderHero(category, archives, viewer) {
     <span class="chip">${icon("layers")}<strong>${formatCount(videoTotal)}</strong> videos</span>
     <span class="chip">${icon("calendar")}<strong>${remaining}</strong> ${remaining === 1 ? "day" : "days"} left</span>
     <span class="chip">${icon("lock")} Network-locked</span>`;
+}
+
+function renderHeroTitle(name) {
+  const title = document.getElementById("hero-title");
+  const words = name.trim().split(/\s+/);
+  const lead = words.length > 1 ? words.slice(0, -1).join(" ") : "";
+  const accent = document.createElement("em");
+  accent.textContent = words.at(-1);
+  title.replaceChildren(...(lead ? [document.createTextNode(`${lead} `), accent] : [document.createTextNode(name)]));
+  if (prefersReducedMotion()) return;
+  splitReveal(title, { delay: 120 });
 }
 
 function renderResume(items) {
@@ -288,7 +312,7 @@ function renderResume(items) {
 
   section.hidden = false;
   rail.innerHTML = items.map((video) => videoCardMarkup(video, { showArchive: true })).join("");
-  hydrateCards(rail, (id) => openPlayer(id));
+  hydrateCards(rail, openVideoCard);
 }
 
 function coverMarkup(archive) {
@@ -313,7 +337,7 @@ function renderArchives(archives) {
   grid.innerHTML = archives
     .map(
       (archive) => `
-      <article class="acard spotlight reveal" data-archive="${archive.id}" data-tilt>
+      <article class="acard reveal" data-archive="${archive.id}" data-light>
         ${coverMarkup(archive)}
         <span class="pill acard__count">${plural(archive.videoCount, "video")}</span>
         <div class="acard__body">
@@ -327,27 +351,55 @@ function renderArchives(archives) {
     )
     .join("");
 
-  grid.querySelectorAll("[data-start]").forEach((node) => {
-    node.addEventListener("click", (event) => {
-      event.stopPropagation();
+  grid.querySelectorAll("[data-archive]").forEach((card) => {
+    card.addEventListener("click", () => {
       haptic(10);
-      openArchive(node.dataset.start, { query: "" });
+      openArchive(card.dataset.archive, { query: "", from: card });
     });
   });
 
   markImagesOnLoad(grid);
   enhanceButtons(grid);
-  enableSpotlight(grid);
-  enableTilt(grid);
+  enableTouchLight(grid, "[data-light]", { tilt: 7 });
   revealOnScroll(grid);
 }
 
-async function openArchive(archiveId, { push = true, sort, query } = {}) {
+function renderArchiveCover(ids) {
+  const cover = document.getElementById("archive-cover");
+  const list = (ids ?? []).slice(0, 3);
+  cover.dataset.for = state.archive ?? "";
+  cover.className = `archive-head__cover archive-head__cover--${Math.max(1, list.length)}`;
+  cover.innerHTML = list.length
+    ? list.map((id) => `<span class="archive-head__tile"><img data-fade src="${thumbUrl(id)}" alt="" decoding="async" /></span>`).join("")
+    : '<span class="archive-head__tile"></span>';
+  markImagesOnLoad(cover);
+}
+
+function archiveCoverIsCurrent() {
+  return document.getElementById("archive-cover").dataset.for === state.archive;
+}
+
+async function openArchive(archiveId, { push = true, sort, query, from } = {}) {
   player.teardown();
-  showView("archive");
+  const known = state.archives.find((archive) => archive.id === archiveId);
+  const changedArchive = state.archive !== archiveId;
+  if (known && (changedArchive || !archiveCoverIsCurrent())) {
+    state.archive = archiveId;
+    document.getElementById("archive-title").textContent = known.name;
+    document.getElementById("archive-sub").textContent = plural(known.videoCount, "video");
+    renderArchiveCover(known.coverVideoIds);
+  }
+
+  showView(
+    "archive",
+    cardMorphs(from, [
+      [".acard__covers", "morph-media", "archive-cover"],
+      [".acard__title", "morph-title", "archive-title"],
+    ]),
+  );
   if (push) pushUrl(`a=${encodeURIComponent(archiveId)}`);
 
-  if (state.archive !== archiveId) {
+  if (changedArchive) {
     state.query = "";
     searchInput.value = "";
   }
@@ -395,6 +447,7 @@ async function loadVideoPage({ replace = false } = {}) {
     state.videos = replace ? page.videos : [...state.videos, ...page.videos];
 
     document.getElementById("archive-title").textContent = page.archive.name;
+    if (!archiveCoverIsCurrent() && page.videos.length) renderArchiveCover(page.videos.map((video) => video.id));
     document.getElementById("archive-sub").textContent = state.query
       ? `${plural(page.total, "result")} for “${state.query}”`
       : `${plural(page.total, "video")}, numbered #1 to #${page.total || 0}`;
@@ -407,7 +460,7 @@ async function loadVideoPage({ replace = false } = {}) {
         : `<div class="empty empty--cast">${castMarkup("reze-smile")}This archive has no videos yet.</div>`;
     } else {
       grid.insertAdjacentHTML("beforeend", page.videos.map((video) => videoCardMarkup(video)).join(""));
-      hydrateCards(grid, (id) => openPlayer(id));
+      hydrateCards(grid, openVideoCard);
     }
 
     const remaining = state.total - state.videos.length;
@@ -468,9 +521,24 @@ function cancelUpNext() {
   document.getElementById("upnext-overlay").hidden = true;
 }
 
-async function openPlayer(videoId, { push = true } = {}) {
+async function openPlayer(videoId, { push = true, from } = {}) {
   cancelUpNext();
-  showView("player");
+  player.teardown();
+
+  const playerVideo = document.getElementById("player-video");
+  playerVideo.poster = thumbUrl(videoId);
+  const cardTitle = from?.querySelector(".vcard__title")?.textContent;
+  const cardNumber = from?.querySelector(".thumb__number")?.textContent;
+  if (cardTitle) document.getElementById("player-title").textContent = cardTitle;
+  if (cardNumber) document.getElementById("player-number").textContent = cardNumber;
+
+  showView(
+    "player",
+    cardMorphs(from, [
+      [".thumb", "morph-media", "player-stage"],
+      [".vcard__title", "morph-title", "player-title"],
+    ]),
+  );
   if (push) pushUrl(`v=${encodeURIComponent(videoId)}`);
 
   document.getElementById("player-error").hidden = true;
@@ -564,7 +632,7 @@ async function loadUpNext(video) {
 
     section.hidden = false;
     rail.innerHTML = others.map((item) => videoCardMarkup(item)).join("");
-    hydrateCards(rail, (id) => openPlayer(id));
+    hydrateCards(rail, openVideoCard);
   } catch {
     section.hidden = true;
   }
@@ -693,8 +761,34 @@ document.getElementById("logout-button").addEventListener("click", async () => {
 
 window.addEventListener("popstate", () => route());
 
+const silk = startSilk({ intensity: 0.78 });
+if (document.documentElement.dataset.arrival === "on") {
+  silk.settle(window.innerWidth / 2, window.innerHeight * 0.22, { duration: 2600 });
+}
+
+function trackStickyToolbar() {
+  const toolbar = document.querySelector(".toolbar");
+  let queued = false;
+  const update = () => {
+    queued = false;
+    if (views.archive.hidden) return;
+    const stickyTop = parseFloat(getComputedStyle(toolbar).top) || 0;
+    toolbar.classList.toggle("is-stuck", toolbar.getBoundingClientRect().top <= stickyTop + 1 && window.scrollY > 0);
+  };
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(update);
+    },
+    { passive: true },
+  );
+}
+
 trackScroll();
 trackHeroParallax();
+trackStickyToolbar();
 enhanceButtons();
 watchSegmented(sortControl);
 startPresence({

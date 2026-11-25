@@ -1,6 +1,7 @@
 import { api, ApiError, revealOnScroll } from "./api.js";
-import { enhanceButtons, haptic, prefersReducedMotion, toast } from "./ui.js";
+import { enhanceButtons, haptic, prefersReducedMotion, splitReveal, toast } from "./ui.js";
 import { runSplash } from "./splash.js";
+import { startSilk } from "./silk.js";
 
 const form = document.getElementById("gate-form");
 const field = document.getElementById("gate-field");
@@ -19,6 +20,12 @@ const iris = document.getElementById("iris");
 
 const SPARK_COLORS = ["#ff5fbf", "#ff5f8f", "#ffae8a", "#f0cf9e", "#9adaea", "#ffffff", "#8d7bff"];
 let moodTimer = null;
+let silk = { bloom() {}, ripple() {}, settle() {} };
+
+function sealCentre() {
+  const rect = seal.getBoundingClientRect();
+  return [rect.left + rect.width / 2, rect.top + rect.height / 2];
+}
 
 function setMood(mood, holdMs = 0) {
   clearTimeout(moodTimer);
@@ -37,6 +44,7 @@ function showError(message) {
   errorBox.hidden = false;
   restartClass(form, "shake");
   restartClass(seal, "is-denied");
+  silk.ripple(...sealCentre());
   setMood("sad", 2600);
   haptic([30, 40, 30]);
 }
@@ -130,8 +138,10 @@ function celebrateAndEnter() {
   prepareIris();
   haptic([12, 60, 12, 60, 40]);
   seal.classList.add("is-unlocking");
+  silk.bloom(...sealCentre(), { duration: UNLOCK_TIMELINE.irisAt });
   setTimeout(() => {
     seal.classList.add("is-unlocked");
+    silk.ripple(...sealCentre());
     haptic(30);
   }, UNLOCK_TIMELINE.burstAt);
   setTimeout(openIris, UNLOCK_TIMELINE.irisAt);
@@ -140,6 +150,7 @@ function celebrateAndEnter() {
 
 input.addEventListener("input", () => {
   if (!errorBox.hidden) clearError();
+  if (!prefersReducedMotion()) restartClass(field, "is-typing");
 });
 
 pasteButton.addEventListener("click", async () => {
@@ -213,6 +224,7 @@ function startSealVideo(preloadedUrl) {
 
 enhanceButtons();
 showReasonFromUrl();
+splitReveal(document.querySelector(".gate__title"), { play: false });
 
 const sessionCheck = api.get("/api/gate/me").then(
   () => true,
@@ -221,6 +233,7 @@ const sessionCheck = api.get("/api/gate/me").then(
 
 runSplash().then(async ({ videoUrl }) => {
   startSealVideo(videoUrl);
+  silk = startSilk({ intensity: 1 });
   revealOnScroll();
   if (await sessionCheck) {
     window.location.replace("/watch");

@@ -12,6 +12,7 @@ const ADMIN_TOKEN = randomBytes(24).toString("hex");
 const CPU_SLOWDOWN = Number(process.env.CPU_SLOWDOWN ?? 4);
 const RUNS = Number(process.env.RUNS ?? 3);
 const BUDGET_MS = 1000 / 60;
+const SCENARIO = process.env.SCENARIO ?? "unlock";
 
 async function adminCall(method, url, body) {
   const response = await fetch(BASE + url, {
@@ -37,6 +38,36 @@ function summarise(intervals) {
     janky: intervals.filter((value) => value > 34).length,
     dropped: Math.max(0, expected - intervals.length),
   };
+}
+
+async function recordFrames(page, durationMs) {
+  return page.evaluate(
+    (duration) =>
+      new Promise((resolve) => {
+        const samples = [];
+        let last = performance.now();
+        const tick = (now) => {
+          samples.push(now - last);
+          last = now;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        setTimeout(() => resolve(samples), duration);
+      }),
+    durationMs,
+  );
+}
+
+async function dragFinger(cdp) {
+  const points = 60;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 200, y: 700 }] });
+  for (let step = 1; step <= points; step++) {
+    const y = 700 - step * 8;
+    const x = 200 + Math.sin(step / 6) * 90;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y }] });
+    await new Promise((resolve) => setTimeout(resolve, 45));
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 }
 
 async function main() {
@@ -78,6 +109,7 @@ async function main() {
         hasTouch: true,
       });
       await context.addInitScript(() => localStorage.setItem("gp_splash_v1", "1"));
+      if (process.env.NO_SILK) await context.addInitScript(() => (HTMLCanvasElement.prototype.getContext = () => null));
       const page = await context.newPage();
       const cdp = await context.newCDPSession(page);
       await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
@@ -95,7 +127,8 @@ async function main() {
         ],
       });
 
-      const intervals = await page.evaluate(
+      const dragging = SCENARIO === "touch" ? dragFinger(cdp) : null;
+      const intervals = SCENARIO === "touch" ? await recordFrames(page, 3100) : await page.evaluate(
         () =>
           new Promise((resolve) => {
             const samples = [];
@@ -120,10 +153,20 @@ async function main() {
           }),
       );
 
+      await dragging;
       const trace = JSON.parse((await browser.stopTracing()).toString("utf8"));
       const events = trace.traceEvents ?? trace;
       const sumMs = (names) =>
         Math.round(events.filter((event) => names.includes(event.name) && event.dur).reduce((sum, event) => sum + event.dur, 0) / 1000);
+      if (process.env.PAINT_DETAIL) {
+        const totals = {};
+        for (const event of events) {
+          if (!event.dur || !["Paint", "PaintImage", "Rasterize", "RasterTask", "ImageDecodeTask", "GPUTask", "UpdateLayer"].includes(event.name)) continue;
+          const key = `${event.name}:${event.args?.data?.nodeName ?? event.args?.data?.layerId ?? ""}`;
+          totals[key] = (totals[key] ?? 0) + event.dur / 1000;
+        }
+        console.log(Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => `${k} ${Math.round(v)}ms`).join("\n"));
+      }
       const frames = events.filter((event) => event.name === "PipelineReporter" && event.ph === "b");
       const states = frames.map((event) => event.args?.chrome_frame_reporter?.state).filter(Boolean);
       const presented = states.filter((state) => state === "STATE_PRESENTED_ALL").length;
@@ -150,7 +193,7 @@ async function main() {
   }
 
   const average = (field) => Math.round((results.reduce((sum, item) => sum + item[field], 0) / results.length) * 10) / 10;
-  console.log(`Unlock animation, 390x844 @3x, CPU slowed ${CPU_SLOWDOWN}x, ${RUNS} runs`);
+  console.log(`${SCENARIO === "touch" ? "Finger drag and scroll on the gate" : "Unlock animation"}, 390x844 @3x, CPU slowed ${CPU_SLOWDOWN}x, ${RUNS} runs`);
   for (const [index, item] of results.entries()) console.log(`  run ${index + 1}`, JSON.stringify(item));
   console.log(
     `  average  fps ${average("fps")}  p95 ${average("p95")} ms  worst ${average("worst")} ms  janky ${average("janky")}`,

@@ -30,7 +30,7 @@ html[data-splash="on"] body {
   border-radius: var(--r-lg);
   border: 1px solid rgba(255, 140, 210, 0.35);
   box-shadow: 0 24px 60px -24px rgba(227, 38, 190, 0.7);
-  animation: splashIn 0.9s var(--ease-spring) both;
+  animation: splashIn 1.2s var(--ease-silk) both;
   transform-origin: 50% 60%;
 }
 
@@ -161,13 +161,11 @@ html[data-splash="on"] body {
 @keyframes splashIn {
   from {
     opacity: 0;
-    transform: scale(0.86) translateY(18px) rotate(-1.5deg);
-    filter: blur(10px);
+    transform: scale(0.9) translateY(18px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 
@@ -215,8 +213,8 @@ html[data-splash="on"] body {
 
 @keyframes frameOut {
   to {
-    transform: scale(1.18);
-    filter: blur(14px) brightness(1.4);
+    opacity: 0;
+    transform: scale(1.12);
   }
 }
 
