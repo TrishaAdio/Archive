@@ -12,6 +12,7 @@
     "secrets": "node scripts/generate-secrets.mjs",
     "test:e2e": "node tests/e2e.mjs",
     "test:browser": "node tests/browser.mjs",
+    "test:telegram": "node tests/telegram.mjs",
     "screenshots": "node tests/screenshots.mjs",
     "perf": "node tests/perf-unlock.mjs"
   },
@@ -21,7 +22,9 @@
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "mongodb": "^6.20.0",
-    "yauzl": "^3.2.0"
+    "telegram": "^2.26.22",
+    "yauzl": "^3.2.0",
+    "yazl": "^3.3.1"
   },
   "devDependencies": {
     "mongodb-memory-server": "^10.2.3",

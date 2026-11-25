@@ -73,6 +73,7 @@ async function main() {
       MEDIA_ROOT: mediaRoot,
       IP_MATCH_MODE: "relaxed",
       COOKIE_SECURE: "false",
+      TELEGRAM_DRIVER_MODULE: path.resolve(import.meta.dirname, "fake-telegram.mjs"),
     },
     stdio: "ignore",
   });
@@ -190,6 +191,34 @@ async function main() {
   await page.click('.tab[data-tab="broadcast"]');
   await page.waitForTimeout(500);
   await shot("10-admin-broadcast");
+
+  await page.click('.tab[data-tab="telegram"]');
+  await page.waitForSelector("#tg-login-form:not([hidden])");
+  await shot("10b-admin-telegram-login");
+  await page.fill("#tg-api-id", "123456");
+  await page.fill("#tg-api-hash", "0123456789abcdef0123456789abcdef");
+  await page.fill("#tg-phone", "+15550001");
+  await page.click('#tg-login-form button[type="submit"]');
+  await page.waitForSelector("#tg-code-form:not([hidden])");
+  await shot("10c-admin-telegram-code");
+  await page.fill("#tg-code", "12345");
+  await page.click('#tg-code-form button[type="submit"]');
+  await page.waitForSelector("#tg-account:not([hidden])");
+  await page.fill("#tg-link", "https://t.me/slowchan");
+  await page.fill("#tg-archive-name", "Telegram Drops");
+  await page.fill("#tg-category-code", "77");
+  await page.fill("#tg-category-name", "Telegram Picks");
+  await page.check("#tg-keep-zip", { force: true });
+  await shot("10d-admin-telegram-form");
+  await page.click("#tg-job-button");
+  await page.waitForFunction(() => document.querySelector(".tgjob.is-active .tgjob__stats")?.textContent.includes("/s"), null, { timeout: 20000 });
+  await page.locator("#tg-jobs").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1400);
+  await page.screenshot({ path: path.join(OUT, "10e-admin-telegram-progress.png") });
+  console.log("saved 10e-admin-telegram-progress.png");
+  await page.waitForSelector(".tgjob.is-done", { timeout: 30000 });
+  await page.locator("#tg-jobs").scrollIntoViewIfNeeded();
+  await shot("10f-admin-telegram-done");
 
   const desktop = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const desktopPage = await desktop.newPage();

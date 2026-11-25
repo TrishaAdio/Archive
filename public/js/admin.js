@@ -1,5 +1,6 @@
 import { api, ApiError, escapeHtml, formatBytes, formatDate, formatCount, icon, plural } from "./api.js";
 import { confirmSheet, countUp, enhanceButtons, syncSegmented, toast, trackScroll, watchSegmented } from "./ui.js";
+import { createTelegramAdmin } from "./telegram-admin.js";
 
 const loginView = document.getElementById("login-view");
 const consoleView = document.getElementById("console-view");
@@ -39,8 +40,14 @@ function stagger(root, selector) {
   root.querySelectorAll(selector).forEach((node, index) => node.style.setProperty("--i", String(Math.min(index, 14))));
 }
 
+const telegram = createTelegramAdmin({
+  getCategories: () => state.categories,
+  onLibraryChanged: () => Promise.all([loadCategories(), loadArchives(), loadDashboard()]).catch(() => null),
+});
+
 function showLogin() {
   clearInterval(state.refreshTimer);
+  telegram.stop();
   consoleView.hidden = true;
   loginView.hidden = false;
   document.getElementById("admin-token").focus();
@@ -85,7 +92,7 @@ async function enterConsole() {
   enhanceButtons();
 
   await Promise.all([loadDashboard(), loadCategories(), loadArchives()]);
-  await Promise.all([browse(""), loadKeys(), loadBroadcasts(), loadActivity()]);
+  await Promise.all([browse(""), loadKeys(), loadBroadcasts(), loadActivity(), telegram.start()]);
 
   clearInterval(state.refreshTimer);
   state.refreshTimer = setInterval(() => {
@@ -107,6 +114,7 @@ tabs.querySelectorAll(".tab").forEach((tab) => {
     document.querySelectorAll("[data-panel]").forEach((panel) => {
       panel.hidden = panel.dataset.panel !== tab.dataset.tab;
     });
+    if (tab.dataset.tab === "telegram") telegram.onShown();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
 });
@@ -188,6 +196,7 @@ async function loadCategories() {
   document.getElementById("archive-category").innerHTML = options || '<option value="">Create a category first</option>';
   document.getElementById("key-category").innerHTML = options || '<option value="">Create a category first</option>';
   document.getElementById("bc-category").innerHTML = `<option value="">Everyone</option>${options}`;
+  telegram.refreshCategoryOptions();
 }
 
 document.getElementById("category-form").addEventListener("submit", async (event) => {

@@ -48,6 +48,7 @@ function loadConfig() {
     maxValidityDays: intEnv("MAX_VALIDITY_DAYS", 3650),
     cookieSecure: (process.env.COOKIE_SECURE ?? "true") !== "false",
     siteName: process.env.SITE_NAME ?? "Get Pleasure",
+    telegramDriverModule: process.env.TELEGRAM_DRIVER_MODULE || null,
   };
 }
 
