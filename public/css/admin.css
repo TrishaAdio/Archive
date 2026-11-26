@@ -59,11 +59,9 @@
 .tabs-wrap {
   position: sticky;
   top: calc(var(--bar-h) + var(--safe-t));
-  transition: top var(--t-med) var(--ease-out);
   z-index: 50;
   padding: 10px var(--gutter);
-  background: rgba(9, 7, 12, 0.96);
-  backdrop-filter: blur(18px);
+  background: rgba(9, 7, 12, 0.97);
 }
 
 .tabs-wrap::after {

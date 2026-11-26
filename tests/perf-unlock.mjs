@@ -75,13 +75,26 @@ const SCENARIO_LABELS = {
   touch: "Finger drag and scroll on the gate",
   open: "Opening a video from the archive",
   back: "Going back from a video to the archive",
+  "scroll-home": "Flick-scrolling the home page",
+  "scroll-archive": "Flick-scrolling a 36-video archive",
+  "archive-open": "Opening an archive from its card",
+  sheet: "Opening the menu sheet",
+};
+
+const INTERACTIONS = {
+  "scroll-home": { stopAt: "home", durationMs: 2600 },
+  "scroll-archive": { stopAt: "archive", durationMs: 2600 },
+  "archive-open": { stopAt: "home", durationMs: 1800 },
+  sheet: { stopAt: "home", durationMs: 1400 },
+  idle: { stopAt: "home", durationMs: 2000 },
 };
 
 async function seedArchive(mediaRoot) {
   const folder = path.join(mediaRoot, "perf");
   await fs.mkdir(folder, { recursive: true });
   const sample = await fs.readFile(path.resolve(import.meta.dirname, "fixtures", "sample.webm"));
-  for (let index = 1; index <= 9; index++) await fs.writeFile(path.join(folder, `clip-${index}.webm`), sample);
+  const count = SCENARIO === "scroll-archive" ? 36 : 9;
+  for (let index = 1; index <= count; index++) await fs.writeFile(path.join(folder, `clip-${index}.webm`), sample);
   const archive = await adminCall("POST", "/api/admin/archives", { categoryCode: 12, name: "Perf Archive" });
   await adminCall("POST", `/api/admin/archives/${archive.id}/import`, { relPath: "perf" });
 }
@@ -92,6 +105,7 @@ async function unlockInto(page, key) {
   await page.waitForURL(/\/watch/, { timeout: 20000 });
   await page.locator("#archive-grid [data-archive]").first().waitFor({ timeout: 20000 });
   await page.waitForTimeout(1200);
+  if ((INTERACTIONS[SCENARIO]?.stopAt ?? "archive") === "home") return;
   await page.locator("#archive-grid [data-archive]").first().click();
   await page.locator("#video-grid [data-video]").first().waitFor({ timeout: 20000 });
   await page.waitForTimeout(1500);
@@ -130,6 +144,30 @@ function recordTransition(page, durationMs) {
   );
 }
 
+async function flick(cdp) {
+  for (const [distance, wait] of [[-1400, 250], [-1100, 250], [1600, 0]]) {
+    await cdp.send("Input.synthesizeScrollGesture", {
+      x: 195,
+      y: distance < 0 ? 700 : 200,
+      yDistance: distance,
+      speed: 2600,
+      gestureSourceType: "touch",
+      preventFling: false,
+    });
+    if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
+
+async function recordInteraction(page, cdp) {
+  const { durationMs } = INTERACTIONS[SCENARIO];
+  const recording = recordFrames(page, durationMs);
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  if (SCENARIO.startsWith("scroll")) await flick(cdp);
+  else if (SCENARIO === "archive-open") await page.locator("#archive-grid [data-archive] .acard__cta").first().evaluate((node) => node.click());
+  else if (SCENARIO === "sheet") await page.locator("#menu-toggle").evaluate((node) => node.click());
+  return recording;
+}
+
 async function main() {
   const mediaRoot = await fs.mkdtemp(path.join(os.tmpdir(), "gp-perf-"));
   const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
@@ -157,7 +195,8 @@ async function main() {
 
   await adminCall("POST", "/api/admin/categories", { code: 12, name: "Premium" });
   const transition = SCENARIO === "open" || SCENARIO === "back";
-  if (transition) await seedArchive(mediaRoot);
+  const interaction = Boolean(INTERACTIONS[SCENARIO]);
+  if (transition || interaction) await seedArchive(mediaRoot);
   const browser = await chromium.launch();
   const results = [];
 
@@ -176,7 +215,7 @@ async function main() {
       const cdp = await context.newCDPSession(page);
       await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => document.getElementById("seal-video")?.currentTime > 0.3, { timeout: 15000 });
-      if (transition) await unlockInto(page, key.key);
+      if (transition || interaction) await unlockInto(page, key.key);
       else await page.fill("#key-input", key.key);
       await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_SLOWDOWN });
 
@@ -197,7 +236,7 @@ async function main() {
         firstMoveAt = recorded.firstMoveAt;
         return recorded.samples;
       };
-      const intervals = transition ? await recordTransitionFrames() : SCENARIO === "touch" ? await recordFrames(page, 3100) : await page.evaluate(
+      const intervals = interaction ? await recordInteraction(page, cdp) : transition ? await recordTransitionFrames() : SCENARIO === "touch" ? await recordFrames(page, 3100) : await page.evaluate(
         () =>
           new Promise((resolve) => {
             const samples = [];

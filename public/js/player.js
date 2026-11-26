@@ -76,8 +76,10 @@ function createPlayer({ onError, onAuthError, onEnded = () => {}, onUserResume =
   }
 
   function moveWatermark() {
-    watermark.style.setProperty("--wm-x", `${6 + Math.random() * 60}%`);
-    watermark.style.setProperty("--wm-y", `${6 + Math.random() * 46}%`);
+    const width = stage.clientWidth || 360;
+    const height = stage.clientHeight || 200;
+    watermark.style.setProperty("--wm-x", `${Math.round(width * (0.06 + Math.random() * 0.6))}px`);
+    watermark.style.setProperty("--wm-y", `${Math.round(height * (0.06 + Math.random() * 0.46))}px`);
   }
 
   async function saveProgress({ keepalive = false } = {}) {

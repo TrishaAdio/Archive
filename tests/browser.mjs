@@ -516,8 +516,8 @@ async function main() {
     const progressWidth = await page
       .locator("#resume-rail .thumb__progress-fill")
       .first()
-      .evaluate((node) => node.style.width);
-    check("resume progress bar has a width", /%$/.test(progressWidth) && parseFloat(progressWidth) > 0, `got ${progressWidth}`);
+      .evaluate((node) => node.style.transform);
+    check("resume progress bar fills with a transform", /^scaleX\(0\.\d+\)$/.test(progressWidth) && parseFloat(progressWidth.slice(7)) > 0, `got ${progressWidth}`);
 
     section("Broadcast popup with I Read");
     const broadcast = await adminCall("POST", "/api/admin/broadcasts", {
